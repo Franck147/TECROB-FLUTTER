@@ -43,7 +43,7 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
     return Scaffold(
       backgroundColor: AppColors.fondoPrincipal,
       appBar: AppBar(
-        title: const Text('Órdenes de Servicio'),
+        title: const Text('Gestión de Órdenes'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -55,9 +55,57 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
       ),
       body: Column(
         children: [
+          // ── Métricas Operativas Superiores (Tocar para Filtrar) ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    titulo: 'Todas',
+                    valor: '${ordenesState.todasLasOrdenes.length}',
+                    color: AppColors.textoPrincipal,
+                    isSelected: ordenesState.filtroEstado == null,
+                    onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado(null),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildMetricCard(
+                    titulo: 'Pendientes',
+                    valor: '${ordenesState.pendientesCount}',
+                    color: AppColors.rojoPrimario,
+                    isSelected: ordenesState.filtroEstado == 'pendiente',
+                    onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado('pendiente'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildMetricCard(
+                    titulo: 'En Progreso',
+                    valor: '${ordenesState.enProgresoCount}',
+                    color: AppColors.tertiary,
+                    isSelected: ordenesState.filtroEstado == 'en_progreso',
+                    onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado('en_progreso'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildMetricCard(
+                    titulo: 'Listas',
+                    valor: '${ordenesState.listasCount}',
+                    color: AppColors.estadoListoTexto,
+                    isSelected: ordenesState.filtroEstado == 'listo',
+                    onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado('listo'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // ── Barra de Búsqueda ──
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: TextField(
               controller: _searchController,
               onChanged: (val) {
@@ -76,50 +124,6 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
                       )
                     : null,
               ),
-            ),
-          ),
-
-          // ── Chips de Filtro por Estado con Contadores ──
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: [
-                _buildFilterChip(
-                  label: 'Todas',
-                  count: ordenesState.todasLasOrdenes.length,
-                  isSelected: ordenesState.filtroEstado == null,
-                  onSelected: () =>
-                      ref.read(ordenesProvider.notifier).setFiltroEstado(null),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: 'Pendientes',
-                  count: ordenesState.pendientesCount,
-                  isSelected: ordenesState.filtroEstado == 'pendiente',
-                  activeColor: AppColors.rojoPrimario,
-                  onSelected: () =>
-                      ref.read(ordenesProvider.notifier).setFiltroEstado('pendiente'),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: 'En progreso',
-                  count: ordenesState.enProgresoCount,
-                  isSelected: ordenesState.filtroEstado == 'en_progreso',
-                  activeColor: AppColors.tertiary,
-                  onSelected: () =>
-                      ref.read(ordenesProvider.notifier).setFiltroEstado('en_progreso'),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: 'Listas',
-                  count: ordenesState.listasCount,
-                  isSelected: ordenesState.filtroEstado == 'listo',
-                  activeColor: AppColors.estadoListoTexto,
-                  onSelected: () =>
-                      ref.read(ordenesProvider.notifier).setFiltroEstado('listo'),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: 4),
@@ -208,40 +212,62 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
     );
   }
 
-  Widget _buildFilterChip({
-    required String label,
-    required int count,
+  Widget _buildMetricCard({
+    required String titulo,
+    required String valor,
+    required Color color,
     required bool isSelected,
-    required VoidCallback onSelected,
-    Color activeColor = AppColors.rojoPrimario,
+    required VoidCallback onTap,
   }) {
-    return ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? activeColor.withValues(alpha: 0.3)
-                  : AppColors.fondoBorde,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$count',
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.15)
+              : AppColors.fondoTarjeta,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : AppColors.fondoBorde,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            Text(
+              valor,
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? activeColor : AppColors.textoSecundario,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: isSelected ? color : AppColors.textoPrincipal,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : AppColors.textoSecundario,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
-      selected: isSelected,
-      onSelected: (_) => onSelected(),
     );
   }
 }

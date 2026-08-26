@@ -155,36 +155,68 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  3. DASHBOARD STATE NOTIFIER
+//  3. DASHBOARD STATE NOTIFIER (Centro Financiero y Operativo)
 // ═══════════════════════════════════════════════════════════════════
 
 class DashboardState {
   final bool isLoading;
+  final double totalIngresos;
+  final double cuentasPorCobrar;
+  final int totalOrdenes;
+  final int equiposReparados;
+  final double ticketPromedio;
   final int activasCount;
   final int pendientesCount;
-  final List<OrdenModel> ordenesRecientes;
+  final int listasCount;
+  final List<OrdenModel> ordenesListasParaEntrega;
+  final Map<String, int> distribucionEstados;
+  final Map<String, int> distribucionTiposEquipo;
   final String? errorMessage;
 
   DashboardState({
     this.isLoading = false,
+    this.totalIngresos = 0.0,
+    this.cuentasPorCobrar = 0.0,
+    this.totalOrdenes = 0,
+    this.equiposReparados = 0,
+    this.ticketPromedio = 0.0,
     this.activasCount = 0,
     this.pendientesCount = 0,
-    this.ordenesRecientes = const [],
+    this.listasCount = 0,
+    this.ordenesListasParaEntrega = const [],
+    this.distribucionEstados = const {},
+    this.distribucionTiposEquipo = const {},
     this.errorMessage,
   });
 
   DashboardState copyWith({
     bool? isLoading,
+    double? totalIngresos,
+    double? cuentasPorCobrar,
+    int? totalOrdenes,
+    int? equiposReparados,
+    double? ticketPromedio,
     int? activasCount,
     int? pendientesCount,
-    List<OrdenModel>? ordenesRecientes,
+    int? listasCount,
+    List<OrdenModel>? ordenesListasParaEntrega,
+    Map<String, int>? distribucionEstados,
+    Map<String, int>? distribucionTiposEquipo,
     String? errorMessage,
   }) {
     return DashboardState(
       isLoading: isLoading ?? this.isLoading,
+      totalIngresos: totalIngresos ?? this.totalIngresos,
+      cuentasPorCobrar: cuentasPorCobrar ?? this.cuentasPorCobrar,
+      totalOrdenes: totalOrdenes ?? this.totalOrdenes,
+      equiposReparados: equiposReparados ?? this.equiposReparados,
+      ticketPromedio: ticketPromedio ?? this.ticketPromedio,
       activasCount: activasCount ?? this.activasCount,
       pendientesCount: pendientesCount ?? this.pendientesCount,
-      ordenesRecientes: ordenesRecientes ?? this.ordenesRecientes,
+      listasCount: listasCount ?? this.listasCount,
+      ordenesListasParaEntrega: ordenesListasParaEntrega ?? this.ordenesListasParaEntrega,
+      distribucionEstados: distribucionEstados ?? this.distribucionEstados,
+      distribucionTiposEquipo: distribucionTiposEquipo ?? this.distribucionTiposEquipo,
       errorMessage: errorMessage,
     );
   }
@@ -198,15 +230,69 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   Future<void> cargarDatos(int empresaId) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final activas = await _ordenRepo.contarOrdenesActivas(empresaId);
-      final pendientes = await _ordenRepo.contarOrdenesPendientes(empresaId);
-      final recientes = await _ordenRepo.listarOrdenes(empresaId, limit: 10);
+      final todas = await _ordenRepo.listarOrdenes(empresaId);
+
+      double ingresos = 0.0;
+      double porCobrar = 0.0;
+      int reparados = 0;
+      int pendientes = 0;
+      int activas = 0;
+      int listas = 0;
+
+      final List<OrdenModel> listasEntrega = [];
+      final Map<String, int> estadosMap = {
+        'pendiente': 0,
+        'diagnostico': 0,
+        'en_progreso': 0,
+        'listo': 0,
+        'entregado': 0,
+        'cancelado': 0,
+      };
+
+      final Map<String, int> tiposMap = {};
+
+      for (final o in todas) {
+        final est = o.estado.toLowerCase();
+        estadosMap[est] = (estadosMap[est] ?? 0) + 1;
+
+        if (est != 'cancelado') {
+          ingresos += (o.subtotal - o.descuento);
+          porCobrar += o.saldoPendiente;
+        }
+
+        if (est == 'entregado' || est == 'listo') {
+          reparados++;
+        }
+
+        if (est == 'pendiente') pendientes++;
+        if (est == 'listo') {
+          listas++;
+          listasEntrega.add(o);
+        }
+        if (est == 'pendiente' || est == 'diagnostico' || est == 'en_progreso' || est == 'listo') {
+          activas++;
+        }
+
+        // Tipo equipo
+        final tipo = o.equipo?.tipo.toLowerCase() ?? 'otro';
+        tiposMap[tipo] = (tiposMap[tipo] ?? 0) + 1;
+      }
+
+      final ticketProm = todas.isNotEmpty && ingresos > 0 ? (ingresos / todas.length) : 0.0;
 
       state = state.copyWith(
         isLoading: false,
+        totalIngresos: ingresos,
+        cuentasPorCobrar: porCobrar,
+        totalOrdenes: todas.length,
+        equiposReparados: reparados,
+        ticketPromedio: ticketProm,
         activasCount: activas,
         pendientesCount: pendientes,
-        ordenesRecientes: recientes,
+        listasCount: listas,
+        ordenesListasParaEntrega: listasEntrega,
+        distribucionEstados: estadosMap,
+        distribucionTiposEquipo: tiposMap,
       );
     } catch (e) {
       state = state.copyWith(
