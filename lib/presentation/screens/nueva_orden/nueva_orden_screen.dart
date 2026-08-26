@@ -86,49 +86,66 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
   Future<void> _buscarDni(String dniInput) async {
     final dni = dniInput.replaceAll(RegExp(r'\D'), '').trim();
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    if (empresaId == null || dni.length != 8) return;
+    if (dni.length != 8) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El DNI debe tener exactamente 8 dígitos numéricos.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _buscandoDni = true;
       _dniMensajeEstado = null;
     });
 
-    // 1. Buscar en BD local de Supabase de la empresa
-    final clienteRepo = ref.read(clienteRepositoryProvider);
-    final clienteExistente = await clienteRepo.buscarClientePorDni(empresaId, dni);
+    final auth = ref.read(authProvider);
+    final empresaId = auth.tecnico?.empresaId;
 
-    if (clienteExistente != null) {
-      setState(() {
-        _clienteSeleccionado = clienteExistente;
-        _buscandoDni = false;
-        _nombreClienteController.text = clienteExistente.nombre;
-        _apellidoClienteController.text = clienteExistente.apellido ?? '';
-        if (clienteExistente.telefono != null && clienteExistente.telefono!.isNotEmpty) {
-          _telefonoClienteController.text = clienteExistente.telefono!;
+    // 1. Buscar en BD local de Supabase de la empresa (si hay empresaId)
+    if (empresaId != null) {
+      try {
+        final clienteRepo = ref.read(clienteRepositoryProvider);
+        final clienteExistente = await clienteRepo.buscarClientePorDni(empresaId, dni);
+
+        if (clienteExistente != null) {
+          setState(() {
+            _clienteSeleccionado = clienteExistente;
+            _buscandoDni = false;
+            _nombreClienteController.text = clienteExistente.nombre;
+            _apellidoClienteController.text = clienteExistente.apellido ?? '';
+            if (clienteExistente.telefono != null && clienteExistente.telefono!.isNotEmpty) {
+              _telefonoClienteController.text = clienteExistente.telefono!;
+            }
+            if (clienteExistente.email != null && clienteExistente.email!.isNotEmpty) {
+              _emailClienteController.text = clienteExistente.email!;
+            }
+            _dniMensajeEstado = '✓ Cliente registrado en el sistema: ${clienteExistente.nombreCompleto}';
+          });
+          return;
         }
-        if (clienteExistente.email != null && clienteExistente.email!.isNotEmpty) {
-          _emailClienteController.text = clienteExistente.email!;
-        }
-        _dniMensajeEstado = '✓ Cliente registrado en el sistema: ${clienteExistente.nombreCompleto}';
-      });
-      return;
+      } catch (e) {
+        debugPrint('Aviso: Error buscando cliente en BD local: $e');
+      }
     }
 
-    // 2. Consultar a la API de RENIEC con fallback multi-proveedor
+    // 2. Consultar a la API de RENIEC (ApisPeru)
     final dniService = ref.read(dniServiceProvider);
     final datosDni = await dniService.consultarDni(dni);
 
     setState(() {
       _buscandoDni = false;
       _clienteSeleccionado = null;
-      if (datosDni != null && datosDni.nombres != null && datosDni.nombres!.isNotEmpty) {
-        _nombreClienteController.text = datosDni.nombres ?? '';
+      if (datosDni != null && datosDni.nombres != null && datosDni.nombres!.trim().isNotEmpty) {
+        _nombreClienteController.text = datosDni.nombres!.trim();
         _apellidoClienteController.text = datosDni.apellidosCompletos;
         _dniMensajeEstado = '✓ Datos obtenidos de RENIEC: ${datosDni.nombreCompleto}. Ingresa su celular.';
       } else {
-        _dniMensajeEstado = 'ℹ️ DNI no registrado. Completa los nombres y celular abajo.';
+        _dniMensajeEstado = 'ℹ️ DNI no encontrado en RENIEC. Ingrésalo manualmente abajo.';
       }
     });
   }
