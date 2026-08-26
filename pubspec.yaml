@@ -18,6 +18,7 @@ dependencies:
 
   # Peticiones HTTP (API DNI)
   dio: ^5.4.3+1
+  http: ^1.2.1
 
   # Generación e Impresión de PDF
   pdf: ^3.10.8
