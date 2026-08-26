@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import '../../data/models/dni_respuesta_model.dart';
 
@@ -9,46 +11,56 @@ class DniService {
       receiveTimeout: const Duration(seconds: 12),
       headers: {
         'Accept': 'application/json',
+        'User-Agent': 'TecrobSys-Flutter/1.0',
       },
     ),
   );
 
-  /// Consulta DNI en ApisPeru con fallback automático
+  /// Consulta DNI en ApisPeru con token
   Future<DniRespuestaModel?> consultarDni(String numeroDni) async {
     final dniLimpio = numeroDni.replaceAll(RegExp(r'\D'), '').trim();
     if (dniLimpio.length != 8) return null;
 
-    // 1. Intentar con Proveedor Principal (ApisPeru)
+    // 1. Proveedor Principal: ApisPeru
     try {
-      final url = '${AppConstants.dniBaseUrl}dni/$dniLimpio';
+      const token = AppConstants.dniApiToken;
+      final url = 'https://dniruc.apisperu.com/api/v1/dni/$dniLimpio?token=$token';
+
       final response = await _dio.get(
         url,
-        queryParameters: {'token': AppConstants.dniApiToken},
         options: Options(
           headers: {
-            'Authorization': 'Bearer ${AppConstants.dniApiToken}',
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
           },
+          responseType: ResponseType.json,
         ),
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data is Map<String, dynamic>
-            ? response.data as Map<String, dynamic>
-            : (response.data is Map ? Map<String, dynamic>.from(response.data as Map) : null);
+        Map<String, dynamic>? data;
+
+        if (response.data is Map) {
+          data = Map<String, dynamic>.from(response.data as Map);
+        } else if (response.data is String) {
+          try {
+            data = Map<String, dynamic>.from(jsonDecode(response.data as String) as Map);
+          } catch (_) {}
+        }
 
         if (data != null) {
           final model = DniRespuestaModel.fromJson(data);
           if (model.nombres != null && model.nombres!.trim().isNotEmpty) {
+            debugPrint('✓ DNI $dniLimpio encontrado en ApisPeru: ${model.nombreCompleto}');
             return model;
           }
         }
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('Aviso: Fallo proveedor principal ApisPeru para DNI $dniLimpio: $e');
+      debugPrint('Aviso: Fallo proveedor principal ApisPeru para DNI $dniLimpio: $e');
     }
 
-    // 2. Intentar con Proveedor de Respaldo Secundario (ApiPeru / Open DNI)
+    // 2. Proveedor Secundario de Respaldo: PeruDevs
     try {
       final fallbackResponse = await _dio.get(
         'https://api.perudevs.com/api/v1/dni/simple',
@@ -59,9 +71,14 @@ class DniService {
       );
 
       if (fallbackResponse.statusCode == 200 && fallbackResponse.data != null) {
-        final data = fallbackResponse.data is Map<String, dynamic>
-            ? fallbackResponse.data as Map<String, dynamic>
-            : null;
+        Map<String, dynamic>? data;
+        if (fallbackResponse.data is Map) {
+          data = Map<String, dynamic>.from(fallbackResponse.data as Map);
+        } else if (fallbackResponse.data is String) {
+          try {
+            data = Map<String, dynamic>.from(jsonDecode(fallbackResponse.data as String) as Map);
+          } catch (_) {}
+        }
 
         if (data != null && data['result'] != null && data['result'] is Map) {
           final resMap = Map<String, dynamic>.from(data['result'] as Map);
@@ -73,13 +90,13 @@ class DniService {
             apellidoMaterno: resMap['apellido_materno']?.toString(),
           );
           if (model.nombres != null && model.nombres!.trim().isNotEmpty) {
+            debugPrint('✓ DNI $dniLimpio encontrado en Proveedor Secundario: ${model.nombreCompleto}');
             return model;
           }
         }
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('Aviso: Fallo proveedor secundario DNI para $dniLimpio: $e');
+      debugPrint('Aviso: Fallo proveedor secundario DNI para $dniLimpio: $e');
     }
 
     return null;
