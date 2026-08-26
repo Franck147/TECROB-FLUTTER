@@ -57,6 +57,9 @@ class OrdenModel {
       ? '#$numeroOrden'
       : '#$id';
 
+  String get codigoVisual => numeroOrdenDisplay;
+  String get clienteNombreCompleto => cliente?.nombreCompleto ?? 'Cliente';
+
   String get estadoDisplay => StatusHelper.obtenerTexto(estado);
 
   String get subtotalFormateado => CurrencyFormatter.format(subtotal);

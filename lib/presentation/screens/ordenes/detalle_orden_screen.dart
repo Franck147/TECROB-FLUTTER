@@ -8,6 +8,7 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/status_helper.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/change_status_dialog.dart';
+import '../../widgets/imprimir_stickers_dialog.dart';
 import '../../widgets/register_payment_dialog.dart';
 import '../../widgets/status_badge.dart';
 
@@ -62,6 +63,13 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
+  void _abrirDialogoStickers(dynamic orden) {
+    showDialog(
+      context: context,
+      builder: (ctx) => ImprimirStickersDialog(orden: orden),
+    );
+  }
+
   Future<void> _marcarListoYAvisar() async {
     final state = ref.read(detalleOrdenProvider(widget.ordenId));
     final orden = state.orden;
@@ -80,6 +88,11 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.fondoBorde),
+        ),
         title: const Text('Marcar Orden como Lista'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -91,7 +104,8 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.fondoSuperficie,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.fondoBorde),
               ),
               child: Text(
                 mensajeWa,
@@ -103,11 +117,16 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar y Notificar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.verdeWhatsapp,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.send_rounded, size: 16),
+            label: const Text('Confirmar y Notificar'),
           ),
         ],
       ),
@@ -150,7 +169,12 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       appBar: AppBar(
         title: Text(orden != null ? 'Orden ${orden.numeroOrdenDisplay}' : 'Detalle de Orden'),
         actions: [
-          if (orden != null)
+          if (orden != null) ...[
+            IconButton(
+              icon: const Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoClaro),
+              tooltip: 'Imprimir Stickers Térmicos',
+              onPressed: () => _abrirDialogoStickers(orden),
+            ),
             IconButton(
               icon: _isGeneratingPdf
                   ? const SizedBox(
@@ -159,9 +183,10 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'Exportar PDF',
+              tooltip: 'Exportar Comprobante PDF',
               onPressed: _isGeneratingPdf ? null : _compartirPdf,
             ),
+          ],
         ],
       ),
       body: state.isLoading && orden == null
@@ -182,6 +207,10 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                       _buildHeaderCard(orden),
                       const SizedBox(height: 12),
 
+                      // ── Acciones Rápidas (Stickers + PDF + WA) ──
+                      _buildQuickActionsRow(orden),
+                      const SizedBox(height: 12),
+
                       // ── Cliente Card ──
                       _buildClienteCard(orden),
                       const SizedBox(height: 12),
@@ -196,7 +225,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
 
                       // ── Resumen Financiero ──
                       _buildTotalesCard(orden),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
 
                       // ── Botones de Acción Operativa ──
                       _buildActionButtons(orden),
@@ -207,13 +236,51 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildHeaderCard(orden) {
+  Widget _buildQuickActionsRow(dynamic orden) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _abrirDialogoStickers(orden),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              side: BorderSide(color: AppColors.rojoPrimario.withValues(alpha: 0.4)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.bluetooth_audio_rounded, size: 18, color: AppColors.rojoPrimario),
+            label: const Text(
+              'Stickers Térmicos',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _isGeneratingPdf ? null : _compartirPdf,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              side: const BorderSide(color: AppColors.fondoBorde),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoClaro),
+            label: const Text(
+              'Comprobante PDF',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCard(dynamic orden) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -253,7 +320,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildClienteCard(orden) {
+  Widget _buildClienteCard(dynamic orden) {
     final cliente = orden.cliente;
     final tel = cliente?.telefono ?? '';
 
@@ -262,7 +329,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,12 +386,12 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               ),
               if (tel.isNotEmpty) ...[
                 IconButton(
-                  icon: const Icon(Icons.phone, color: AppColors.rojoPrimario, size: 20),
+                  icon: const Icon(Icons.phone_rounded, color: AppColors.rojoPrimario, size: 20),
                   onPressed: () => WhatsappService.realizarLlamada(tel),
                   tooltip: 'Llamar',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.chat, color: AppColors.verdeWhatsapp, size: 20),
+                  icon: const Icon(Icons.chat_bubble_rounded, color: AppColors.verdeWhatsapp, size: 20),
                   onPressed: () => WhatsappService.abrirChat(telefono: tel),
                   tooltip: 'WhatsApp',
                 ),
@@ -336,7 +403,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildEquipoCard(orden) {
+  Widget _buildEquipoCard(dynamic orden) {
     final equipo = orden.equipo;
 
     return Container(
@@ -344,7 +411,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,7 +454,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             if (orden.contrasenaEquipo != null && orden.contrasenaEquipo!.isNotEmpty)
               _buildDataRow('Contraseña Equipo', orden.contrasenaEquipo!),
             if (equipo.accesorios != null && equipo.accesorios!.isNotEmpty)
-              _buildDataRow('Accesorios', equipo.accesorios!),
+              _buildDataRow('Accesorios Registrados', equipo.accesorios!),
             if (equipo.desperfecto != null && equipo.desperfecto!.isNotEmpty) ...[
               const SizedBox(height: 4),
               const Text(
@@ -406,7 +473,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildServiciosCard(orden) {
+  Widget _buildServiciosCard(dynamic orden) {
     final items = orden.itemsServicio;
 
     return Container(
@@ -414,7 +481,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,13 +527,13 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildTotalesCard(orden) {
+  Widget _buildTotalesCard(dynamic orden) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Column(
         children: [
@@ -496,17 +563,21 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildActionButtons(orden) {
+  Widget _buildActionButtons(dynamic orden) {
     return Column(
       children: [
         // Botón principal: Avisar Listo
         ElevatedButton.icon(
-          icon: const Icon(Icons.check_circle_outline),
+          icon: const Icon(Icons.check_circle_outline_rounded),
           label: const Text('MARCAR LISTA Y AVISAR POR WHATSAPP'),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.tertiaryContainer,
             foregroundColor: AppColors.tertiary,
             minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.tertiary.withValues(alpha: 0.4)),
+            ),
           ),
           onPressed: _marcarListoYAvisar,
         ),
@@ -517,7 +588,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.payment, size: 18),
+                icon: const Icon(Icons.payment_rounded, size: 18),
                 label: const Text('Registrar Pago'),
                 onPressed: () => _abrirDialogoPago(orden.saldoPendiente),
               ),
@@ -525,23 +596,12 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
                 label: const Text('Cambiar Estado'),
                 onPressed: () => _abrirDialogoCambioEstado(orden.estado),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-
-        // Botón PDF
-        OutlinedButton.icon(
-          icon: const Icon(Icons.picture_as_pdf, size: 18, color: AppColors.rojoClaro),
-          label: const Text('Generar / Compartir PDF A4'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(44),
-          ),
-          onPressed: _isGeneratingPdf ? null : _compartirPdf,
         ),
       ],
     );

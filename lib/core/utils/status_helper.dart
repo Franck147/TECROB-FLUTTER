@@ -84,6 +84,27 @@ class StatusHelper {
     }
   }
 
+  static IconData obtenerIconoEstado(String? estado) {
+    if (estado == null) return Icons.help_outline_rounded;
+    switch (estado.toLowerCase()) {
+      case 'pendiente':
+        return Icons.hourglass_top_rounded;
+      case 'diagnostico':
+        return Icons.search_rounded;
+      case 'en_progreso':
+        return Icons.build_circle_rounded;
+      case 'listo':
+        return Icons.check_circle_rounded;
+      case 'entregado':
+        return Icons.task_alt_rounded;
+      case 'cancelado':
+      case 'sin_reparacion':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.info_outline_rounded;
+    }
+  }
+
   static String obtenerTipoEquipoTexto(String? tipo) {
     if (tipo == null) return 'Equipo';
     switch (tipo.toLowerCase()) {
@@ -105,21 +126,21 @@ class StatusHelper {
   }
 
   static IconData obtenerIconoEquipo(String? tipo) {
-    if (tipo == null) return Icons.devices_other;
+    if (tipo == null) return Icons.devices_other_rounded;
     switch (tipo.toLowerCase()) {
       case 'laptop':
-        return Icons.laptop_mac;
+        return Icons.laptop_chromebook_rounded;
       case 'computadora':
       case 'pc':
-        return Icons.desktop_windows;
+        return Icons.desktop_windows_rounded;
       case 'impresora':
-        return Icons.print;
+        return Icons.print_rounded;
       case 'tablet':
-        return Icons.tablet_android;
+        return Icons.tablet_mac_rounded;
       case 'celular':
-        return Icons.smartphone;
+        return Icons.smartphone_rounded;
       default:
-        return Icons.devices_other;
+        return Icons.devices_rounded;
     }
   }
 }

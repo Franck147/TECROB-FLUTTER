@@ -70,30 +70,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo TecrobSys
+                  // Logo TecrobSys estilizado
                   Center(
                     child: Container(
-                      width: 72,
-                      height: 72,
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
-                        color: AppColors.rojoPrimario,
-                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.rojoPrimario.withValues(alpha: 0.3),
-                            blurRadius: 20,
+                            color: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                            blurRadius: 24,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'T',
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      child: const Icon(
+                        Icons.build_rounded,
+                        color: Colors.white,
+                        size: 38,
                       ),
                     ),
                   ),
@@ -105,7 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                       color: AppColors.textoPrincipal,
                     ),
@@ -123,11 +124,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   // Tarjeta de Formulario
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
                       color: AppColors.fondoTarjeta,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.fondoBorde, width: 1),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,11 +148,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: AppColors.textoPrincipal,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         const Text(
                           'Ingresa con tus credenciales de técnico',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             color: AppColors.textoSecundario,
                           ),
                         ),
@@ -156,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           label: 'Correo Electrónico',
                           hint: 'tecnico@ejemplo.com',
                           keyboardType: TextInputType.emailAddress,
-                          prefixIcon: Icons.email_outlined,
+                          prefixIcon: Icons.alternate_email_rounded,
                           enabled: !authState.isLoading,
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) {
@@ -176,11 +184,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           label: 'Contraseña',
                           hint: '••••••••',
                           obscureText: _obscurePassword,
-                          prefixIcon: Icons.lock_outline,
+                          prefixIcon: Icons.lock_outline_rounded,
                           enabled: !authState.isLoading,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              _obscurePassword
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
                               color: AppColors.textoSecundario,
                               size: 20,
                             ),
@@ -200,18 +210,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 24),
 
                         // Botón Ingresar
-                        ElevatedButton(
-                          onPressed: authState.isLoading ? null : _intentarLogin,
-                          child: authState.isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: authState.isLoading ? null : _intentarLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.rojoPrimario,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 4,
+                              shadowColor: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                            ),
+                            child: authState.isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.login_rounded, size: 18),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'INGRESAR AL SISTEMA',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                )
-                              : const Text('INGRESAR AL SISTEMA'),
+                          ),
                         ),
                       ],
                     ),

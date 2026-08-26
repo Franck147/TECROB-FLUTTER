@@ -46,4 +46,14 @@ class WhatsappService {
   }) {
     return 'Hola $nombreCliente, le informamos de MULTISERVICIOS TECROB SYS que su equipo $equipo (Orden #$numeroOrden) ya se encuentra LISTO para su recojo. Puede pasar a retirarlo cuando guste.';
   }
+
+  static Future<bool> enviarNotificacionEstado({
+    required String telefono,
+    required String nombreCliente,
+    required String numeroOrden,
+    required String estado,
+  }) {
+    final mensaje = 'Hola $nombreCliente, le saludamos de MULTISERVICIOS TECROB SYS. Le informamos que el estado actual de su Orden #$numeroOrden es: ${estado.toUpperCase()}.';
+    return abrirChat(telefono: telefono, mensaje: mensaje);
+  }
 }

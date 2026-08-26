@@ -72,12 +72,17 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.fondoBorde),
+        ),
         title: const Text('Eliminar Servicio'),
         content: Text('¿Estás seguro de eliminar "${servicio.nombre}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -102,10 +107,11 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
         title: const Text('Catálogo de Servicios'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add_rounded),
             tooltip: 'Nuevo Servicio',
             onPressed: () => _abrirDialogoServicio(),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -119,11 +125,11 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                 ref.read(catalogoProvider.notifier).setBusqueda(val);
               },
               decoration: InputDecoration(
-                hintText: 'Buscar servicios...',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                hintText: 'Buscar servicios o repuestos...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 22),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
+                        icon: const Icon(Icons.clear_rounded, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           ref.read(catalogoProvider.notifier).setBusqueda('');
@@ -166,6 +172,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
             child: RefreshIndicator(
               onRefresh: () async => _cargarServicios(),
               color: AppColors.rojoPrimario,
+              backgroundColor: AppColors.fondoTarjeta,
               child: catalogoState.isLoading && catalogoState.todosLosServicios.isEmpty
                   ? const Center(child: CircularProgressIndicator(color: AppColors.rojoPrimario))
                   : catalogoState.serviciosFiltrados.isEmpty
@@ -175,16 +182,27 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                             style: TextStyle(color: AppColors.textoSecundario),
                           ),
                         )
-                      : ListView.builder(
+                      : ListView.separated(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           itemCount: catalogoState.serviciosFiltrados.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final serv = catalogoState.serviciosFiltrados[index];
-                            return Card(
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.fondoTarjeta,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.fondoBorde),
+                              ),
                               child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: AppColors.rojoContenedor,
-                                  child: Icon(Icons.build, color: AppColors.rojoClaro, size: 18),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.rojoContenedor,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.handyman_rounded,
+                                      color: AppColors.rojoClaro, size: 18),
                                 ),
                                 title: Text(
                                   serv.nombre,
@@ -212,20 +230,43 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                                     Text(
                                       serv.precioFormateado,
                                       style: const TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.rojoClaro,
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert, size: 18),
+                                      icon: const Icon(Icons.more_vert_rounded, size: 18),
+                                      color: AppColors.fondoSuperficie,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        side: const BorderSide(color: AppColors.fondoBorde),
+                                      ),
                                       onSelected: (val) {
                                         if (val == 'edit') _abrirDialogoServicio(serv);
                                         if (val == 'delete') _confirmarEliminar(serv);
                                       },
                                       itemBuilder: (ctx) => const [
-                                        PopupMenuItem(value: 'edit', child: Text('Editar')),
-                                        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit_rounded, size: 16, color: AppColors.textoPrincipal),
+                                              SizedBox(width: 8),
+                                              Text('Editar'),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
+                                              SizedBox(width: 8),
+                                              Text('Eliminar', style: TextStyle(color: AppColors.error)),
+                                            ],
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ],

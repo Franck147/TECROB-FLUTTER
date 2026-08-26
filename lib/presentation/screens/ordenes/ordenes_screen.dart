@@ -46,17 +46,18 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
         title: const Text('Órdenes de Servicio'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refrescar',
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Actualizar órdenes',
             onPressed: _cargarOrdenes,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: [
           // ── Barra de Búsqueda ──
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: TextField(
               controller: _searchController,
               onChanged: (val) {
@@ -64,10 +65,10 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Buscar por N° orden, cliente, equipo...',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const Icon(Icons.search_rounded, size: 22),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
+                        icon: const Icon(Icons.clear_rounded, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           ref.read(ordenesProvider.notifier).setBusqueda('');
@@ -85,42 +86,50 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
             child: Row(
               children: [
                 _buildFilterChip(
-                  label: 'Todas (${ordenesState.todasLasOrdenes.length})',
+                  label: 'Todas',
+                  count: ordenesState.todasLasOrdenes.length,
                   isSelected: ordenesState.filtroEstado == null,
                   onSelected: () =>
                       ref.read(ordenesProvider.notifier).setFiltroEstado(null),
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
-                  label: 'Pendientes (${ordenesState.pendientesCount})',
+                  label: 'Pendientes',
+                  count: ordenesState.pendientesCount,
                   isSelected: ordenesState.filtroEstado == 'pendiente',
+                  activeColor: AppColors.rojoPrimario,
                   onSelected: () =>
                       ref.read(ordenesProvider.notifier).setFiltroEstado('pendiente'),
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
-                  label: 'En progreso (${ordenesState.enProgresoCount})',
+                  label: 'En progreso',
+                  count: ordenesState.enProgresoCount,
                   isSelected: ordenesState.filtroEstado == 'en_progreso',
+                  activeColor: AppColors.tertiary,
                   onSelected: () =>
                       ref.read(ordenesProvider.notifier).setFiltroEstado('en_progreso'),
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
-                  label: 'Listas (${ordenesState.listasCount})',
+                  label: 'Listas',
+                  count: ordenesState.listasCount,
                   isSelected: ordenesState.filtroEstado == 'listo',
+                  activeColor: AppColors.estadoListoTexto,
                   onSelected: () =>
                       ref.read(ordenesProvider.notifier).setFiltroEstado('listo'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
 
           // ── Lista de Órdenes ──
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _cargarOrdenes(),
               color: AppColors.rojoPrimario,
+              backgroundColor: AppColors.fondoTarjeta,
               child: ordenesState.isLoading && ordenesState.todasLasOrdenes.isEmpty
                   ? const Center(
                       child: CircularProgressIndicator(color: AppColors.rojoPrimario),
@@ -132,20 +141,38 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(
-                                  Icons.search_off,
-                                  size: 48,
-                                  color: AppColors.textoMuted,
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.fondoSuperficie,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.fondoBorde),
+                                  ),
+                                  child: const Icon(
+                                    Icons.search_off_rounded,
+                                    size: 40,
+                                    color: AppColors.textoMuted,
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                                 Text(
                                   _searchController.text.isNotEmpty ||
                                           ordenesState.filtroEstado != null
-                                      ? 'No se encontraron órdenes con ese filtro'
+                                      ? 'No se encontraron órdenes con los filtros aplicados'
                                       : 'No hay órdenes registradas',
                                   style: const TextStyle(
+                                    color: AppColors.textoPrincipal,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Intenta cambiar los términos de búsqueda o el filtro.',
+                                  style: TextStyle(
                                     color: AppColors.textoSecundario,
-                                    fontSize: 14,
+                                    fontSize: 12,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -183,11 +210,36 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
 
   Widget _buildFilterChip({
     required String label,
+    required int count,
     required bool isSelected,
     required VoidCallback onSelected,
+    Color activeColor = AppColors.rojoPrimario,
   }) {
     return ChoiceChip(
-      label: Text(label),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? activeColor.withValues(alpha: 0.3)
+                  : AppColors.fondoBorde,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? activeColor : AppColors.textoSecundario,
+              ),
+            ),
+          ),
+        ],
+      ),
       selected: isSelected,
       onSelected: (_) => onSelected(),
     );

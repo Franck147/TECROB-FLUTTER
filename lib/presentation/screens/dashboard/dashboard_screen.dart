@@ -40,49 +40,84 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final dashboardState = ref.watch(dashboardProvider);
 
     final nombreTecnico = authState.tecnico?.nombre ?? 'Técnico';
+    final rolTecnico = authState.tecnico?.esAdministrador == true ? 'Administrador' : 'Técnico Especialista';
     final fechaHoy = DateFormatter.obtenerFechaHoy();
 
     return Scaffold(
       backgroundColor: AppColors.fondoPrincipal,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        backgroundColor: AppColors.fondoPrincipal,
+        elevation: 0,
+        title: Row(
           children: [
-            Text(
-              '¡Hola, $nombreTecnico!',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.rojoPrimario.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.handyman_rounded, color: Colors.white, size: 20),
+              ),
             ),
-            Text(
-              fechaHoy,
-              style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hola, $nombreTecnico',
+                    style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '$rolTecnico • $fechaHoy',
+                    style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refrescar',
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.textoSecundario),
+            tooltip: 'Actualizar datos',
             onPressed: _cargarDatos,
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => _cargarDatos(),
         color: AppColors.rojoPrimario,
+        backgroundColor: AppColors.fondoTarjeta,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Métricas Resumen ──
+              // ── Métricas Resumen Rediseñadas ──
               Row(
                 children: [
                   Expanded(
                     child: _buildMetricCard(
                       titulo: 'Órdenes Activas',
+                      subtitulo: 'En taller',
                       valor: '${dashboardState.activasCount}',
-                      icono: Icons.pending_actions,
+                      icono: Icons.pending_actions_rounded,
                       color: AppColors.secondary,
                     ),
                   ),
@@ -90,8 +125,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Expanded(
                     child: _buildMetricCard(
                       titulo: 'Pendientes',
+                      subtitulo: 'Por diagnosticar',
                       valor: '${dashboardState.pendientesCount}',
-                      icono: Icons.error_outline,
+                      icono: Icons.hourglass_top_rounded,
                       color: AppColors.rojoPrimario,
                     ),
                   ),
@@ -103,22 +139,43 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ÓRDENES RECIENTES',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                      color: AppColors.textoSecundario,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 3.5,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.rojoPrimario,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'ÓRDENES RECIENTES',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: AppColors.textoPrincipal,
+                        ),
+                      ),
+                    ],
                   ),
-                  TextButton(
+                  TextButton.icon(
                     onPressed: widget.onNavigateToOrdenes,
-                    child: const Text('Ver todas'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.rojoPrimario,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                    label: const Text(
+                      'Ver todas',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
               // ── Lista de Órdenes Recientes ──
               if (dashboardState.isLoading && dashboardState.ordenesRecientes.isEmpty)
@@ -130,15 +187,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 )
               else if (dashboardState.ordenesRecientes.isEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
                   alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.fondoTarjeta,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.fondoBorde),
+                  ),
                   child: const Column(
                     children: [
                       Icon(Icons.inbox_outlined, size: 48, color: AppColors.textoMuted),
-                      SizedBox(height: 12),
+                      SizedBox(height: 14),
                       Text(
                         'No hay órdenes registradas aún',
-                        style: TextStyle(color: AppColors.textoSecundario, fontSize: 14),
+                        style: TextStyle(
+                          color: AppColors.textoPrincipal,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Presiona el botón (+) para registrar tu primera orden',
+                        style: TextStyle(color: AppColors.textoSecundario, fontSize: 12),
                       ),
                     ],
                   ),
@@ -171,6 +242,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildMetricCard({
     required String titulo,
+    required String subtitulo,
     required String valor,
     required IconData icono,
     required Color color,
@@ -179,8 +251,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,24 +267,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.25)),
+                ),
+                child: Icon(icono, color: color, size: 20),
+              ),
               Text(
-                titulo,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textoSecundario,
-                  fontWeight: FontWeight.w500,
+                valor,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: color,
                 ),
               ),
-              Icon(icono, color: color, size: 18),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            valor,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: color,
+            titulo,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: AppColors.textoPrincipal,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitulo,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textoSecundario,
             ),
           ),
         ],

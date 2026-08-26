@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/currency_formatter.dart';
+import '../../../core/services/pdf_invoice_service.dart';
 import '../../../core/utils/date_formatter.dart';
+import '../../../core/utils/status_helper.dart';
 import '../../../data/models/cliente_model.dart';
 import '../../../data/models/servicio_catalogo_model.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/create_service_dialog.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/imprimir_stickers_dialog.dart';
 
 class NuevaOrdenScreen extends ConsumerStatefulWidget {
   final VoidCallback onOrderCreated;
@@ -21,7 +23,7 @@ class NuevaOrdenScreen extends ConsumerStatefulWidget {
 class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // ── Controladores Cliente ──
+  // Controladores Cliente
   final _dniController = TextEditingController();
   final _nombreClienteController = TextEditingController();
   final _apellidoClienteController = TextEditingController();
@@ -31,8 +33,9 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   ClienteModel? _clienteSeleccionado;
   bool _buscandoDni = false;
   bool _mostrarFormNuevoCliente = false;
+  String? _dniMensajeEstado;
 
-  // ── Controladores Equipo ──
+  // Controladores Equipo
   String _tipoEquipo = 'laptop';
   final _marcaController = TextEditingController();
   final _modeloController = TextEditingController();
@@ -40,28 +43,29 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   final _desperfectoController = TextEditingController();
   final _descripcionController = TextEditingController();
   final _contrasenaController = TextEditingController();
+  final _accesorioPersonalizadoController = TextEditingController();
 
+  // Accesorios
   final List<String> _accesoriosDisponibles = [
-    'Funda', 'Mouse', 'Cargador', 'Mochila', 'Cable datos', 'Estabilizador'
+    'Cargador',
+    'Mouse',
+    'Mochila / Funda',
+    'Cable de Poder',
+    'Batería',
+    'Memoria USB',
+    'Teclado',
   ];
   final Set<String> _accesoriosSeleccionados = {};
 
-  // ── Controladores Orden & Servicios ──
+  // Servicios
+  final List<ServicioCatalogoModel> _serviciosSeleccionados = [];
+
+  // Parámetros Orden
   String _prioridad = 'normal';
   DateTime? _fechaPrometida;
-  final List<ServicioCatalogoModel> _serviciosSeleccionados = [];
-  bool _guardando = false;
+  final _adelantoController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = ref.read(authProvider);
-      if (auth.tecnico?.empresaId != null) {
-        ref.read(catalogoProvider.notifier).cargarServicios(auth.tecnico!.empresaId!);
-      }
-    });
-  }
+  bool _guardando = false;
 
   @override
   void dispose() {
@@ -76,18 +80,13 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     _desperfectoController.dispose();
     _descripcionController.dispose();
     _contrasenaController.dispose();
+    _accesorioPersonalizadoController.dispose();
+    _adelantoController.dispose();
     super.dispose();
   }
 
-  double get _subtotalCalculado {
-    double sum = 0.0;
-    for (var s in _serviciosSeleccionados) {
-      sum += s.precioBase;
-    }
-    return sum;
-  }
-
-  Future<void> _buscarDni(String dni) async {
+  Future<void> _buscarDni(String dniInput) async {
+    final dni = dniInput.replaceAll(RegExp(r'\D'), '').trim();
     final auth = ref.read(authProvider);
     final empresaId = auth.tecnico?.empresaId;
     if (empresaId == null || dni.length != 8) return;
@@ -96,9 +95,10 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       _buscandoDni = true;
       _clienteSeleccionado = null;
       _mostrarFormNuevoCliente = false;
+      _dniMensajeEstado = null;
     });
 
-    // 1. Buscar en BD local de Supabase
+    // 1. Buscar en BD local de Supabase de la empresa
     final clienteRepo = ref.read(clienteRepositoryProvider);
     final clienteExistente = await clienteRepo.buscarClientePorDni(empresaId, dni);
 
@@ -106,23 +106,26 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       setState(() {
         _clienteSeleccionado = clienteExistente;
         _buscandoDni = false;
+        _dniMensajeEstado = '✓ Cliente encontrado en la base de datos';
       });
       return;
     }
 
-    // 2. Si no existe, consultar a la API de RENIEC (ApisPeru)
+    // 2. Consultar a la API de RENIEC con fallback multi-proveedor
     final dniService = ref.read(dniServiceProvider);
     final datosDni = await dniService.consultarDni(dni);
 
     setState(() {
       _buscandoDni = false;
       _mostrarFormNuevoCliente = true;
-      if (datosDni != null) {
+      if (datosDni != null && datosDni.nombres != null && datosDni.nombres!.isNotEmpty) {
         _nombreClienteController.text = datosDni.nombres ?? '';
         _apellidoClienteController.text = datosDni.apellidosCompletos;
+        _dniMensajeEstado = '✓ Datos obtenidos de RENIEC: ${datosDni.nombreCompleto}';
       } else {
         _nombreClienteController.clear();
         _apellidoClienteController.clear();
+        _dniMensajeEstado = 'ℹ️ DNI no encontrado en RENIEC. Ingrésalo manualmente.';
       }
     });
   }
@@ -162,7 +165,10 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al registrar cliente: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Error al registrar cliente: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -178,13 +184,20 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           return AlertDialog(
-            title: const Text('Seleccionar Servicios', style: TextStyle(fontSize: 18)),
+            backgroundColor: AppColors.fondoTarjeta,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppColors.fondoBorde),
+            ),
+            title: const Text('Seleccionar Servicios del Catálogo',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             content: SizedBox(
               width: double.maxFinite,
               child: todos.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(20),
-                      child: Text('No hay servicios en el catálogo'),
+                      child: Text('No hay servicios en el catálogo',
+                          style: TextStyle(color: AppColors.textoSecundario)),
                     )
                   : ListView.builder(
                       shrinkWrap: true,
@@ -193,7 +206,8 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                         final serv = todos[index];
                         final isChecked = seleccionTemp.contains(serv.id);
                         return CheckboxListTile(
-                          title: Text(serv.nombre, style: const TextStyle(fontSize: 14)),
+                          title: Text(serv.nombre,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                           subtitle: Text(
                             serv.precioFormateado,
                             style: const TextStyle(color: AppColors.rojoClaro, fontSize: 12),
@@ -216,7 +230,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancelar'),
+                child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
               ),
               OutlinedButton(
                 onPressed: () {
@@ -295,13 +309,15 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     setState(() => _guardando = true);
 
     try {
+      final adelantoVal = double.tryParse(_adelantoController.text.trim()) ?? 0.0;
+
       final datosOrden = {
         'empresa_id': empresaId,
         'cliente_id': _clienteSeleccionado!.id,
         'tecnico_id': tecnicoId,
         'estado': 'pendiente',
         'prioridad': _prioridad,
-        'adelanto': 0.0,
+        'adelanto': adelantoVal,
         'descuento': 0.0,
         if (_contrasenaController.text.trim().isNotEmpty)
           'contrasena_equipo': _contrasenaController.text.trim(),
@@ -323,7 +339,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
           'accesorios': _accesoriosSeleccionados.join(', '),
       };
 
-      await ref.read(ordenRepositoryProvider).crearOrdenCompleta(
+      final ordenCreada = await ref.read(ordenRepositoryProvider).crearOrdenCompleta(
             empresaId: empresaId,
             tecnicoId: tecnicoId,
             datosOrden: datosOrden,
@@ -332,14 +348,8 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
           );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Orden guardada exitosamente!'),
-            backgroundColor: AppColors.tertiary,
-          ),
-        );
         _limpiarFormulario();
-        widget.onOrderCreated();
+        _mostrarModalExito(ordenCreada);
       }
     } catch (e) {
       if (mounted) {
@@ -352,6 +362,106 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     }
   }
 
+  void _mostrarModalExito(dynamic orden) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: AppColors.fondoBorde, width: 1.2),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.tertiaryContainer,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.4)),
+              ),
+              child: const Icon(Icons.check_rounded, color: AppColors.tertiary, size: 36),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '¡Orden ${orden.codigoVisual} Registrada!',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textoPrincipal,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Cliente: ${orden.clienteNombreCompleto}\n${orden.equipo?.nombreCompleto ?? ""}',
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textoSecundario),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Botón 1: Stickers Bluetooth
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  showDialog(
+                    context: context,
+                    builder: (_) => ImprimirStickersDialog(orden: orden),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.rojoPrimario,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.bluetooth_audio_rounded, size: 18),
+                label: const Text(
+                  '🏷️ Imprimir Stickers de Accesorios',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Botón 2: Comprobante PDF
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  PdfInvoiceService.imprimirOCompartir(orden);
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: AppColors.fondoBorde),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoClaro),
+                label: const Text(
+                  '📄 Comprobante PDF de Recepción',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Botón 3: Ir a lista
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onOrderCreated();
+              },
+              child: const Text('Continuar a la lista de órdenes',
+                  style: TextStyle(color: AppColors.textoSecundario, fontSize: 12.5)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _limpiarFormulario() {
     setState(() {
       _clienteSeleccionado = null;
@@ -361,12 +471,15 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       _telefonoClienteController.clear();
       _emailClienteController.clear();
       _mostrarFormNuevoCliente = false;
+      _dniMensajeEstado = null;
       _marcaController.clear();
       _modeloController.clear();
       _serieController.clear();
       _desperfectoController.clear();
       _descripcionController.clear();
       _contrasenaController.clear();
+      _accesorioPersonalizadoController.clear();
+      _adelantoController.clear();
       _tipoEquipo = 'laptop';
       _prioridad = 'normal';
       _fechaPrometida = null;
@@ -392,44 +505,55 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
               // ── 1. SECCIÓN CLIENTE ──
               _buildSectionCard(
                 titulo: '1. DATOS DEL CLIENTE',
-                icono: Icons.person_outline,
+                icono: Icons.person_search_rounded,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_clienteSeleccionado != null) ...[
                       // Cliente ya seleccionado
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: AppColors.fondoSuperficie,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.5)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle, color: AppColors.tertiary, size: 24),
-                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: AppColors.tertiaryContainer,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_rounded,
+                                  color: AppColors.tertiary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     _clienteSeleccionado!.nombreCompleto,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 14.5),
                                   ),
                                   Text(
                                     'DNI: ${_clienteSeleccionado!.dni ?? "—"} • Tel: ${_clienteSeleccionado!.telefono ?? "—"}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                                    style: const TextStyle(
+                                        fontSize: 12, color: AppColors.textoSecundario),
                                   ),
                                 ],
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.close, size: 20),
+                              icon: const Icon(Icons.close_rounded, size: 20),
                               onPressed: () {
                                 setState(() {
                                   _clienteSeleccionado = null;
                                   _dniController.clear();
+                                  _dniMensajeEstado = null;
                                 });
                               },
                             ),
@@ -437,38 +561,81 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                         ),
                       ),
                     ] else ...[
-                      // Buscador de DNI
-                      CustomTextField(
-                        controller: _dniController,
-                        label: 'DNI del Cliente (8 dígitos)',
-                        hint: 'Ingresa DNI para buscar o registrar...',
-                        keyboardType: TextInputType.number,
-                        prefixIcon: Icons.badge_outlined,
-                        onChanged: (val) {
-                          if (val.trim().length == 8) {
-                            _buscarDni(val.trim());
-                          }
-                        },
+                      // Buscador de DNI con Botón de Búsqueda
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: CustomTextField(
+                              controller: _dniController,
+                              label: 'DNI del Cliente (8 dígitos)',
+                              hint: 'Ingresa DNI para autocompletar...',
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.badge_outlined,
+                              onChanged: (val) {
+                                if (val.trim().length == 8) {
+                                  _buscarDni(val.trim());
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _buscandoDni
+                                  ? null
+                                  : () => _buscarDni(_dniController.text.trim()),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.rojoContenedor,
+                                foregroundColor: AppColors.rojoClaro,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: BorderSide(
+                                    color: AppColors.rojoPrimario.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                              ),
+                              child: _buscandoDni
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.rojoClaro,
+                                      ),
+                                    )
+                                  : const Icon(Icons.search_rounded, size: 22),
+                            ),
+                          ),
+                        ],
                       ),
-                      if (_buscandoDni)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Center(
-                            child: SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.rojoPrimario),
+
+                      if (_dniMensajeEstado != null) ...[
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            _dniMensajeEstado!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _dniMensajeEstado!.startsWith('✓')
+                                  ? AppColors.tertiary
+                                  : AppColors.secondary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
+                      ],
 
                       if (_mostrarFormNuevoCliente) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: AppColors.fondoSuperficie,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: AppColors.fondoBorde),
                           ),
                           child: Column(
@@ -476,7 +643,11 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                             children: [
                               const Text(
                                 'Registrar Nuevo Cliente',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                  color: AppColors.textoPrincipal,
+                                ),
                               ),
                               const SizedBox(height: 10),
                               CustomTextField(
@@ -493,13 +664,18 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                               const SizedBox(height: 8),
                               CustomTextField(
                                 controller: _telefonoClienteController,
-                                label: 'Teléfono / Celular',
+                                label: 'Teléfono / Celular WhatsApp',
                                 keyboardType: TextInputType.phone,
+                                prefixIcon: Icons.phone_android_rounded,
                               ),
                               const SizedBox(height: 12),
-                              ElevatedButton(
-                                onPressed: _registrarClienteRapido,
-                                child: const Text('Confirmar y Usar Cliente'),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _registrarClienteRapido,
+                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                                  label: const Text('Confirmar y Asignar Cliente'),
+                                ),
                               ),
                             ],
                           ),
@@ -509,38 +685,46 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
               // ── 2. SECCIÓN EQUIPO ──
               _buildSectionCard(
                 titulo: '2. DATOS DEL EQUIPO',
-                icono: Icons.devices_other,
+                icono: Icons.devices_other_rounded,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Tipo de Equipo:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-                    const SizedBox(height: 6),
+                    const Text('Tipo de Equipo:',
+                        style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 6,
+                      spacing: 8,
                       runSpacing: 6,
-                      children: ['laptop', 'computadora', 'impresora', 'tablet', 'celular', 'otro'].map((tipo) {
+                      children: ['laptop', 'computadora', 'impresora', 'tablet', 'celular', 'otro']
+                          .map((tipo) {
+                        final isSel = _tipoEquipo == tipo;
                         return ChoiceChip(
+                          avatar: Icon(
+                            StatusHelper.obtenerIconoEquipo(tipo),
+                            size: 16,
+                            color: isSel ? AppColors.rojoClaro : AppColors.textoSecundario,
+                          ),
                           label: Text(tipo.toUpperCase()),
-                          selected: _tipoEquipo == tipo,
+                          selected: isSel,
                           onSelected: (selected) {
                             if (selected) setState(() => _tipoEquipo = tipo);
                           },
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: CustomTextField(
                             controller: _marcaController,
                             label: 'Marca *',
-                            hint: 'Ej. HP, Dell...',
+                            hint: 'Ej. Lenovo, HP, Dell...',
                             textCapitalization: TextCapitalization.characters,
                           ),
                         ),
@@ -549,7 +733,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                           child: CustomTextField(
                             controller: _modeloController,
                             label: 'Modelo',
-                            hint: 'Ej. Pavilion...',
+                            hint: 'Ej. ThinkPad E14...',
                             textCapitalization: TextCapitalization.characters,
                           ),
                         ),
@@ -570,8 +754,8 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                         Expanded(
                           child: CustomTextField(
                             controller: _contrasenaController,
-                            label: 'Contraseña Equipo',
-                            hint: 'PIN o clave',
+                            label: 'PIN / Clave',
+                            hint: 'Contraseña de equipo',
                             textCapitalization: TextCapitalization.characters,
                           ),
                         ),
@@ -581,13 +765,27 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                     CustomTextField(
                       controller: _desperfectoController,
                       label: 'Problema / Falla Reportada *',
-                      hint: 'Describe lo que reporta el cliente...',
-                      textCapitalization: TextCapitalization.characters,
+                      hint: 'Describe la falla que reporta el cliente...',
+                      textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
                     ),
-                    const SizedBox(height: 12),
-                    const Text('Accesorios Entregados:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 14),
+
+                    // Accesorios con rotulado
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Accesorios Entregados (Se generará sticker para c/u):',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textoSecundario,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
@@ -608,114 +806,186 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _accesorioPersonalizadoController,
+                            label: 'Otro accesorio...',
+                            hint: 'Ej. Funda cuero, Cable HDMI...',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            final custom = _accesorioPersonalizadoController.text.trim();
+                            if (custom.isNotEmpty) {
+                              setState(() {
+                                _accesoriosSeleccionados.add(custom);
+                                _accesorioPersonalizadoController.clear();
+                              });
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.fondoSuperficie,
+                            foregroundColor: AppColors.textoPrincipal,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          ),
+                          child: const Text('Agregar'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              // ── 3. SERVICIOS Y COSTOS ──
+              // ── 3. SECCIÓN SERVICIOS & PARÁMETROS ──
               _buildSectionCard(
-                titulo: '3. SERVICIOS Y ENTREGA',
-                icono: Icons.build_outlined,
+                titulo: '3. SERVICIOS Y RECEPCIÓN',
+                icono: Icons.build_circle_outlined,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Prioridad
-                    const Text('Prioridad:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      children: ['baja', 'normal', 'alta', 'urgente'].map((prio) {
-                        return ChoiceChip(
-                          label: Text(prio.toUpperCase()),
-                          selected: _prioridad == prio,
-                          onSelected: (selected) {
-                            if (selected) setState(() => _prioridad = prio);
-                          },
-                        );
-                      }).toList(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Servicios agregados:',
+                          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                        ),
+                        TextButton.icon(
+                          onPressed: _abrirSelectorServicios,
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('Catálogo'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // Fecha Prometida
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Fecha prometida de entrega:'),
-                      subtitle: Text(
-                        _fechaPrometida != null
-                            ? DateFormatter.fechaAFormatoIso(_fechaPrometida!)
-                            : 'No seleccionada (opcional)',
-                        style: const TextStyle(color: AppColors.rojoClaro),
-                      ),
-                      trailing: const Icon(Icons.calendar_month, color: AppColors.rojoPrimario),
-                      onTap: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now().add(const Duration(days: 2)),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (date != null) {
-                          setState(() => _fechaPrometida = date);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Botón para seleccionar servicios
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Agregar Servicios del Catálogo'),
-                      onPressed: _abrirSelectorServicios,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Lista de servicios agregados
-                    if (_serviciosSeleccionados.isNotEmpty) ...[
-                      ..._serviciosSeleccionados.map((s) {
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(s.nombre, style: const TextStyle(fontSize: 13)),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    if (_serviciosSeleccionados.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.fondoSuperficie,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.fondoBorde),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textoMuted),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Puedes añadir servicios ahora o después durante el diagnóstico.',
+                                style: TextStyle(fontSize: 12, color: AppColors.textoMuted),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._serviciosSeleccionados.map(
+                        (serv) => Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.fondoSuperficie,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(s.precioFormateado, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 16, color: AppColors.textoMuted),
-                                onPressed: () {
-                                  setState(() => _serviciosSeleccionados.remove(s));
+                              Text(serv.nombre, style: const TextStyle(fontSize: 13)),
+                              Row(
+                                children: [
+                                  Text(serv.precioFormateado,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.rojoClaro)),
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded,
+                                        size: 16, color: AppColors.textoMuted),
+                                    onPressed: () {
+                                      setState(() => _serviciosSeleccionados.remove(serv));
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Prioridad:',
+                                  style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+                              const SizedBox(height: 4),
+                              DropdownButtonFormField<String>(
+                                initialValue: _prioridad,
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'baja', child: Text('Baja')),
+                                  DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                                  DropdownMenuItem(value: 'alta', child: Text('Alta (Urgente)')),
+                                ],
+                                onChanged: (v) {
+                                  if (v != null) setState(() => _prioridad = v);
                                 },
                               ),
                             ],
                           ),
-                        );
-                      }),
-                      const Divider(color: AppColors.fondoBorde),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Subtotal Estimado:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text(
-                            CurrencyFormatter.format(_subtotalCalculado),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.rojoClaro),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _adelantoController,
+                            label: 'Adelanto S/',
+                            hint: '0.00',
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            prefixIcon: Icons.attach_money_rounded,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // ── Botón Guardar Orden ──
-              ElevatedButton(
-                onPressed: _guardando ? null : _guardarOrden,
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-                child: _guardando
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('GUARDAR ORDEN DE SERVICIO'),
+              // Botón Guardar Orden
+              SizedBox(
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _guardando ? null : _guardarOrden,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.rojoPrimario,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                  icon: _guardando
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check_circle_outline_rounded, size: 22),
+                  label: Text(
+                    _guardando ? 'Guardando Orden...' : 'REGISTRAR ORDEN DE SERVICIO',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -732,28 +1002,28 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fondoTarjeta,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icono, size: 18, color: AppColors.rojoPrimario),
+              Icon(icono, color: AppColors.rojoPrimario, size: 18),
               const SizedBox(width: 8),
               Text(
                 titulo,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                  color: AppColors.textoSecundario,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: AppColors.textoPrincipal,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           child,
         ],
       ),

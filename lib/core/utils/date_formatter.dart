@@ -30,6 +30,16 @@ class DateFormatter {
     }
   }
 
+  static String formatearFechaHoraCorta(String? fechaIso) {
+    if (fechaIso == null || fechaIso.isEmpty) return '—';
+    try {
+      final dateTime = DateTime.parse(fechaIso).toLocal();
+      return DateFormat('dd/MM/yy HH:mm', 'es_PE').format(dateTime);
+    } catch (_) {
+      return formatearFechaCorta(fechaIso);
+    }
+  }
+
   static String obtenerFechaHoy() {
     final now = DateTime.now();
     final dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];

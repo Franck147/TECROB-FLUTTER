@@ -22,6 +22,7 @@ class TecnicoModel {
   });
 
   bool get esAdmin => rol.toLowerCase() == 'administrador' || rol.toLowerCase() == 'admin';
+  bool get esAdministrador => esAdmin;
 
   String get nombreCompleto {
     if (apellido != null && apellido!.trim().isNotEmpty) {

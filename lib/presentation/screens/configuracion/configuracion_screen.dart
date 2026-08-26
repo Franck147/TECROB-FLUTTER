@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/sticker_label_service.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/create_tecnico_dialog.dart';
 import '../auth/login_screen.dart';
@@ -33,12 +34,17 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.fondoBorde),
+        ),
         title: const Text('Cerrar Sesión'),
         content: const Text('¿Estás seguro de que deseas cerrar sesión en TecrobSys?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -57,6 +63,31 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
         ],
       ),
     );
+  }
+
+  void _probarImpresionStickerPrueba() async {
+    final itemPrueba = StickerItem(
+      titulo: '🏷️ STICKER DE PRUEBA',
+      subtitulo: 'Laptop Dell Inspiron 15 (S/N: TEST-001)',
+      ordenCodigo: '#OT-TEST',
+      clienteNombre: 'CLIENTE DE PRUEBA',
+      clienteTelefono: '999-888-777',
+      fecha: '26/08/2026 15:30',
+      esPrincipal: true,
+    );
+
+    try {
+      await StickerLabelService.imprimirStickers(
+        items: [itemPrueba],
+        tituloTrabajo: 'Test_Sticker_TecrobSys',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error en impresión de prueba: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   void _abrirDialogoNuevoTecnico() {
@@ -103,7 +134,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
     if (miId == tecnicoId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No puedes eliminar tu propia cuenta actual.'),
+          content: Text('No puedes desactivar tu propia cuenta actual.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -115,12 +146,17 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.fondoBorde),
+        ),
         title: const Text('Desactivar Técnico'),
         content: Text('¿Deseas dar de baja a "$nombreTecnico"? Ya no podrá acceder al sistema.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -158,16 +194,37 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
               decoration: BoxDecoration(
                 color: AppColors.fondoTarjeta,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.fondoBorde),
+                border: Border.all(color: AppColors.fondoBorde, width: 1.1),
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 36,
-                    backgroundColor: AppColors.rojoPrimario,
-                    child: Text(
-                      tecnico?.inicial ?? '?',
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.rojoPrimario.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        tecnico?.inicial ?? '?',
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -199,18 +256,71 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.logout, color: AppColors.error, size: 18),
+                    icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
                     label: const Text('Cerrar Sesión', style: TextStyle(color: AppColors.error)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.error, width: 1),
                       minimumSize: const Size.fromHeight(40),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _confirmarCerrarSesion,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // ── Sección Impresora Térmica / Bluetooth ──
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.fondoTarjeta,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoPrimario, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'IMPRESORA TÉRMICA & BLUETOOTH',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: AppColors.textoPrincipal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Formato estándar de stickers adhesivos: 50mm x 30mm y rollo térmico 58mm / 80mm con Código QR de orden.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _probarImpresionStickerPrueba,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.rojoPrimario.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.print_rounded, size: 18, color: AppColors.rojoPrimario),
+                      label: const Text(
+                        'Imprimir Etiqueta / Sticker de Prueba',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // ── Sección Exclusiva Admin: Gestión de Técnicos ──
             if (esAdmin) ...[
@@ -227,7 +337,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     ),
                   ),
                   TextButton.icon(
-                    icon: const Icon(Icons.person_add, size: 16),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
                     label: const Text('Nuevo Técnico'),
                     onPressed: _abrirDialogoNuevoTecnico,
                   ),
@@ -250,8 +360,13 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                 )
               else
                 ...configState.tecnicos.map((tec) {
-                  return Card(
+                  return Container(
                     margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.fondoTarjeta,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.fondoBorde),
+                    ),
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: tec.esAdmin ? AppColors.rojoContenedor : AppColors.fondoSuperficie,
@@ -272,14 +387,14 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                         style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
                         tooltip: 'Desactivar',
                         onPressed: () => _confirmarDesactivarTecnico(tec.id, tec.nombreCompleto),
                       ),
                     ),
                   );
                 }),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
             ],
 
             // ── Info de Versión y Empresa ──
@@ -292,7 +407,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'TecrobSys Flutter v1.0.0',
+                    'TecrobSys Flutter v1.0.0 • Sistema de Gestión Técnica',
                     style: TextStyle(fontSize: 10, color: AppColors.textoMuted),
                   ),
                 ],
