@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/services/sticker_label_service.dart';
 import '../../../core/services/whatsapp_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/status_helper.dart';
 import '../../providers/app_providers.dart';
-import '../../widgets/consulta_dni_express_dialog.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
-  final VoidCallback onNavigateToOrdenes;
+  final VoidCallback? onNavigateToOrdenes;
 
   const DashboardScreen({
     super.key,
-    required this.onNavigateToOrdenes,
+    this.onNavigateToOrdenes,
   });
 
   @override
@@ -34,38 +32,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final auth = ref.read(authProvider);
     if (auth.tecnico?.empresaId != null) {
       ref.read(dashboardProvider.notifier).cargarDatos(auth.tecnico!.empresaId!);
-    }
-  }
-
-  void _abrirConsultaDni() {
-    showDialog(
-      context: context,
-      builder: (_) => const ConsultaDniExpressDialog(),
-    );
-  }
-
-  void _probarSticker() async {
-    final item = StickerItem(
-      titulo: '🏷️ STICKER DE PRUEBA',
-      subtitulo: 'Laptop Dell Inspiron 15 (S/N: TEST-001)',
-      ordenCodigo: '#OT-TEST',
-      clienteNombre: 'CLIENTE PRUEBA',
-      clienteTelefono: '999-888-777',
-      fecha: DateFormatter.formatearFechaHoraCorta(DateTime.now().toIso8601String()),
-      esPrincipal: true,
-    );
-
-    try {
-      await StickerLabelService.imprimirStickers(
-        items: [item],
-        tituloTrabajo: 'Test_Sticker_TecrobSys',
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error en impresión: $e'), backgroundColor: AppColors.error),
-        );
-      }
     }
   }
 
@@ -194,50 +160,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-
-              // ══════════════════════════════════════════════════════════════
-              //  2. ACCIONES RÁPIDAS DEL TALLER (TOOLBOX)
-              // ══════════════════════════════════════════════════════════════
-              _buildSectionTitle('HERRAMIENTAS RÁPIDAS', Icons.flash_on_rounded),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      titulo: 'Consulta DNI',
-                      subtitulo: 'Buscar en RENIEC',
-                      icono: Icons.badge_outlined,
-                      color: AppColors.tertiary,
-                      onTap: _abrirConsultaDni,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      titulo: 'Test Sticker',
-                      subtitulo: 'Impresora Bluetooth',
-                      icono: Icons.bluetooth_audio_rounded,
-                      color: AppColors.rojoPrimario,
-                      onTap: _probarSticker,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      titulo: 'Ver Órdenes',
-                      subtitulo: 'Gestión completa',
-                      icono: Icons.receipt_long_rounded,
-                      color: AppColors.secondary,
-                      onTap: widget.onNavigateToOrdenes,
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 22),
 
               // ══════════════════════════════════════════════════════════════
-              //  3. ALERTA: EQUIPOS LISTOS PARA ENTREGA (WHATSAPP)
+              //  2. ALERTA: EQUIPOS LISTOS PARA ENTREGA (WHATSAPP)
               // ══════════════════════════════════════════════════════════════
               if (dashboardState.ordenesListasParaEntrega.isNotEmpty) ...[
                 _buildSectionTitle(
@@ -333,7 +259,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ],
 
               // ══════════════════════════════════════════════════════════════
-              //  4. DISTRIBUCIÓN DEL EMBUDO DE TRABAJO DEL TALLER
+              //  3. DISTRIBUCIÓN DEL EMBUDO DE TRABAJO DEL TALLER
               // ══════════════════════════════════════════════════════════════
               _buildSectionTitle('ESTADO DEL TALLER', Icons.donut_large_rounded),
               const SizedBox(height: 8),
@@ -386,7 +312,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 22),
 
               // ══════════════════════════════════════════════════════════════
-              //  5. TIPOS DE EQUIPO ATENDIDOS
+              //  4. TIPOS DE EQUIPO ATENDIDOS
               // ══════════════════════════════════════════════════════════════
               _buildSectionTitle('EQUIPOS ATENDIDOS EN TALLER', Icons.devices_rounded),
               const SizedBox(height: 8),
@@ -546,59 +472,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required String titulo,
-    required String subtitulo,
-    required IconData icono,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.fondoTarjeta,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.fondoBorde),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icono, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              titulo,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textoPrincipal,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              subtitulo,
-              style: const TextStyle(
-                fontSize: 9.5,
-                color: AppColors.textoMuted,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
       ),
     );
   }
