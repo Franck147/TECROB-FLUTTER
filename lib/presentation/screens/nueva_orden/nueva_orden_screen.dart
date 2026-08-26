@@ -32,7 +32,6 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
   ClienteModel? _clienteSeleccionado;
   bool _buscandoDni = false;
-  bool _mostrarFormNuevoCliente = false;
   String? _dniMensajeEstado;
 
   // Controladores Equipo
@@ -93,8 +92,6 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
     setState(() {
       _buscandoDni = true;
-      _clienteSeleccionado = null;
-      _mostrarFormNuevoCliente = false;
       _dniMensajeEstado = null;
     });
 
@@ -106,7 +103,15 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       setState(() {
         _clienteSeleccionado = clienteExistente;
         _buscandoDni = false;
-        _dniMensajeEstado = '✓ Cliente encontrado en la base de datos';
+        _nombreClienteController.text = clienteExistente.nombre;
+        _apellidoClienteController.text = clienteExistente.apellido ?? '';
+        if (clienteExistente.telefono != null && clienteExistente.telefono!.isNotEmpty) {
+          _telefonoClienteController.text = clienteExistente.telefono!;
+        }
+        if (clienteExistente.email != null && clienteExistente.email!.isNotEmpty) {
+          _emailClienteController.text = clienteExistente.email!;
+        }
+        _dniMensajeEstado = '✓ Cliente registrado en el sistema: ${clienteExistente.nombreCompleto}';
       });
       return;
     }
@@ -117,61 +122,15 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
     setState(() {
       _buscandoDni = false;
-      _mostrarFormNuevoCliente = true;
+      _clienteSeleccionado = null;
       if (datosDni != null && datosDni.nombres != null && datosDni.nombres!.isNotEmpty) {
         _nombreClienteController.text = datosDni.nombres ?? '';
         _apellidoClienteController.text = datosDni.apellidosCompletos;
-        _dniMensajeEstado = '✓ Datos obtenidos de RENIEC: ${datosDni.nombreCompleto}';
+        _dniMensajeEstado = '✓ Datos obtenidos de RENIEC: ${datosDni.nombreCompleto}. Ingresa su celular.';
       } else {
-        _nombreClienteController.clear();
-        _apellidoClienteController.clear();
-        _dniMensajeEstado = 'ℹ️ DNI no encontrado en RENIEC. Ingrésalo manualmente.';
+        _dniMensajeEstado = 'ℹ️ DNI no registrado. Completa los nombres y celular abajo.';
       }
     });
-  }
-
-  Future<void> _registrarClienteRapido() async {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    if (empresaId == null) return;
-
-    if (_nombreClienteController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el nombre del cliente')),
-      );
-      return;
-    }
-
-    try {
-      final nuevo = await ref.read(clienteRepositoryProvider).crearCliente({
-        'empresa_id': empresaId,
-        'nombre': _nombreClienteController.text.trim(),
-        'apellido': _apellidoClienteController.text.trim().isNotEmpty
-            ? _apellidoClienteController.text.trim()
-            : null,
-        'dni': _dniController.text.trim(),
-        'telefono': _telefonoClienteController.text.trim().isNotEmpty
-            ? _telefonoClienteController.text.trim()
-            : null,
-        'email': _emailClienteController.text.trim().isNotEmpty
-            ? _emailClienteController.text.trim()
-            : null,
-      });
-
-      setState(() {
-        _clienteSeleccionado = nuevo;
-        _mostrarFormNuevoCliente = false;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al registrar cliente: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
   }
 
   void _abrirSelectorServicios() {
@@ -279,9 +238,18 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   }
 
   Future<void> _guardarOrden() async {
-    if (_clienteSeleccionado == null) {
+    final nombreCliente = _nombreClienteController.text.trim();
+    if (nombreCliente.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debes seleccionar o registrar un cliente')),
+        const SnackBar(content: Text('Ingresa el nombre del cliente')),
+      );
+      return;
+    }
+
+    final telefonoCliente = _telefonoClienteController.text.trim();
+    if (telefonoCliente.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa el número de celular del cliente')),
       );
       return;
     }
@@ -309,11 +277,46 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     setState(() => _guardando = true);
 
     try {
+      int clienteId;
+
+      if (_clienteSeleccionado != null) {
+        clienteId = _clienteSeleccionado!.id;
+        // Actualizar datos del cliente por si se corrigieron
+        await ref.read(clienteRepositoryProvider).actualizarCliente(clienteId, {
+          'nombre': nombreCliente,
+          if (_apellidoClienteController.text.trim().isNotEmpty)
+            'apellido': _apellidoClienteController.text.trim(),
+          if (telefonoCliente.isNotEmpty)
+            'telefono': telefonoCliente,
+          if (_emailClienteController.text.trim().isNotEmpty)
+            'email': _emailClienteController.text.trim(),
+          if (_dniController.text.trim().isNotEmpty)
+            'dni': _dniController.text.trim(),
+        });
+      } else {
+        // Crear cliente nuevo automáticamente
+        final nuevo = await ref.read(clienteRepositoryProvider).crearCliente({
+          'empresa_id': empresaId,
+          'nombre': nombreCliente,
+          'apellido': _apellidoClienteController.text.trim().isNotEmpty
+              ? _apellidoClienteController.text.trim()
+              : null,
+          'dni': _dniController.text.trim().isNotEmpty
+              ? _dniController.text.trim()
+              : null,
+          'telefono': telefonoCliente.isNotEmpty ? telefonoCliente : null,
+          'email': _emailClienteController.text.trim().isNotEmpty
+              ? _emailClienteController.text.trim()
+              : null,
+        });
+        clienteId = nuevo.id;
+      }
+
       final adelantoVal = double.tryParse(_adelantoController.text.trim()) ?? 0.0;
 
       final datosOrden = {
         'empresa_id': empresaId,
-        'cliente_id': _clienteSeleccionado!.id,
+        'cliente_id': clienteId,
         'tecnico_id': tecnicoId,
         'estado': 'pendiente',
         'prioridad': _prioridad,
@@ -470,7 +473,6 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       _apellidoClienteController.clear();
       _telefonoClienteController.clear();
       _emailClienteController.clear();
-      _mostrarFormNuevoCliente = false;
       _dniMensajeEstado = null;
       _marcaController.clear();
       _modeloController.clear();
@@ -510,179 +512,160 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_clienteSeleccionado != null) ...[
-                      // Cliente ya seleccionado
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.fondoSuperficieOf(context),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.5)),
+                    // Buscador de DNI con Botón de Búsqueda
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _dniController,
+                            label: 'DNI del Cliente (8 dígitos)',
+                            hint: 'Ingresa DNI para consultar RENIEC o BD...',
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.badge_outlined,
+                            suffixIcon: _dniController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18),
+                                    onPressed: () {
+                                      setState(() {
+                                        _dniController.clear();
+                                        _dniMensajeEstado = null;
+                                        _clienteSeleccionado = null;
+                                        _nombreClienteController.clear();
+                                        _apellidoClienteController.clear();
+                                        _telefonoClienteController.clear();
+                                        _emailClienteController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
+                            onChanged: (val) {
+                              if (val.trim().length == 8) {
+                                _buscarDni(val.trim());
+                              }
+                            },
+                          ),
                         ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _buscandoDni
+                                ? null
+                                : () => _buscarDni(_dniController.text.trim()),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.rojoContenedorOf(context),
+                              foregroundColor: AppColors.rojoPrimario,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(
+                                  color: AppColors.rojoPrimario.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            child: _buscandoDni
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.rojoPrimario,
+                                    ),
+                                  )
+                                : const Icon(Icons.search_rounded, size: 22),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (_dniMensajeEstado != null) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: AppColors.tertiaryContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check_rounded,
-                                  color: AppColors.tertiary, size: 20),
+                            Icon(
+                              _dniMensajeEstado!.startsWith('✓')
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.info_outline_rounded,
+                              size: 15,
+                              color: _dniMensajeEstado!.startsWith('✓')
+                                  ? AppColors.tertiary
+                                  : AppColors.secondary,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 6),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _clienteSeleccionado!.nombreCompleto,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 14.5),
-                                  ),
-                                  Text(
-                                    'DNI: ${_clienteSeleccionado!.dni ?? "—"} • Tel: ${_clienteSeleccionado!.telefono ?? "—"}',
-                                    style: const TextStyle(
-                                        fontSize: 12, color: AppColors.textoSecundario),
-                                  ),
-                                ],
+                              child: Text(
+                                _dniMensajeEstado!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _dniMensajeEstado!.startsWith('✓')
+                                      ? AppColors.tertiary
+                                      : AppColors.secondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 20),
-                              onPressed: () {
-                                setState(() {
-                                  _clienteSeleccionado = null;
-                                  _dniController.clear();
-                                  _dniMensajeEstado = null;
-                                });
-                              },
                             ),
                           ],
                         ),
                       ),
-                    ] else ...[
-                      // Buscador de DNI con Botón de Búsqueda
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: CustomTextField(
-                              controller: _dniController,
-                              label: 'DNI del Cliente (8 dígitos)',
-                              hint: 'Ingresa DNI para autocompletar...',
-                              keyboardType: TextInputType.number,
-                              prefixIcon: Icons.badge_outlined,
-                              onChanged: (val) {
-                                if (val.trim().length == 8) {
-                                  _buscarDni(val.trim());
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _buscandoDni
-                                  ? null
-                                  : () => _buscarDni(_dniController.text.trim()),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.rojoContenedor,
-                                foregroundColor: AppColors.rojoClaro,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  side: BorderSide(
-                                    color: AppColors.rojoPrimario.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                              ),
-                              child: _buscandoDni
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.rojoClaro,
-                                      ),
-                                    )
-                                  : const Icon(Icons.search_rounded, size: 22),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (_dniMensajeEstado != null) ...[
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            _dniMensajeEstado!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _dniMensajeEstado!.startsWith('✓')
-                                  ? AppColors.tertiary
-                                  : AppColors.secondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      if (_mostrarFormNuevoCliente) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.fondoSuperficie,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.fondoBorde),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Registrar Nuevo Cliente',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.5,
-                                  color: AppColors.textoPrincipal,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              CustomTextField(
-                                controller: _nombreClienteController,
-                                label: 'Nombres *',
-                                textCapitalization: TextCapitalization.words,
-                              ),
-                              const SizedBox(height: 8),
-                              CustomTextField(
-                                controller: _apellidoClienteController,
-                                label: 'Apellidos',
-                                textCapitalization: TextCapitalization.words,
-                              ),
-                              const SizedBox(height: 8),
-                              CustomTextField(
-                                controller: _telefonoClienteController,
-                                label: 'Teléfono / Celular WhatsApp',
-                                keyboardType: TextInputType.phone,
-                                prefixIcon: Icons.phone_android_rounded,
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: _registrarClienteRapido,
-                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                                  label: const Text('Confirmar y Asignar Cliente'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ],
+
+                    const SizedBox(height: 14),
+
+                    // Campos de Nombre y Apellido (Siempre visibles)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _nombreClienteController,
+                            label: 'Nombres *',
+                            hint: 'Ej. Juan Carlos',
+                            textCapitalization: TextCapitalization.words,
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _apellidoClienteController,
+                            label: 'Apellidos',
+                            hint: 'Ej. Pérez Quispe',
+                            textCapitalization: TextCapitalization.words,
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Campos de Teléfono / Celular y Email (Siempre visibles)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _telefonoClienteController,
+                            label: 'Celular WhatsApp *',
+                            hint: 'Ej. 987654321',
+                            keyboardType: TextInputType.phone,
+                            prefixIcon: Icons.phone_android_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: CustomTextField(
+                            controller: _emailClienteController,
+                            label: 'Correo Electrónico (opcional)',
+                            hint: 'cliente@gmail.com',
+                            keyboardType: TextInputType.emailAddress,
+                            prefixIcon: Icons.alternate_email_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
