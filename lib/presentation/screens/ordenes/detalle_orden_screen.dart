@@ -70,80 +70,6 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Future<void> _marcarListoYAvisar() async {
-    final state = ref.read(detalleOrdenProvider(widget.ordenId));
-    final orden = state.orden;
-    if (orden == null) return;
-
-    final clienteNom = orden.cliente?.nombreCompleto ?? 'Cliente';
-    final equipoNom = orden.equipo?.nombreCompleto ?? 'su equipo';
-    final numOrden = orden.numeroOrden ?? '${orden.id}';
-
-    final mensajeWa = WhatsappService.generarMensajeOrdenLista(
-      nombreCliente: clienteNom,
-      equipo: equipoNom,
-      numeroOrden: numOrden,
-    );
-
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.fondoTarjeta,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.fondoBorde),
-        ),
-        title: const Text('Marcar Orden como Lista'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Se cambiará el estado a LISTO y se abrirá WhatsApp con el mensaje:'),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.fondoSuperficie,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.fondoBorde),
-              ),
-              child: Text(
-                mensajeWa,
-                style: const TextStyle(fontSize: 13, color: AppColors.textoPrincipal),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.verdeWhatsapp,
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.send_rounded, size: 16),
-            label: const Text('Confirmar y Notificar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar == true) {
-      await ref
-          .read(detalleOrdenProvider(widget.ordenId).notifier)
-          .actualizarEstado('listo');
-
-      final tel = orden.cliente?.telefono ?? '';
-      if (tel.isNotEmpty) {
-        await WhatsappService.abrirChat(telefono: tel, mensaje: mensajeWa);
-      }
-    }
-  }
-
   Future<void> _compartirPdf() async {
     final state = ref.read(detalleOrdenProvider(widget.ordenId));
     final orden = state.orden;
@@ -159,19 +85,90 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     }
   }
 
+  Future<void> _marcarListoYAvisar() async {
+    final state = ref.read(detalleOrdenProvider(widget.ordenId));
+    final orden = state.orden;
+    if (orden == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.fondoTarjetaOf(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.fondoBordeOf(context)),
+        ),
+        title: const Text('Marcar Orden como Lista'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Se cambiará el estado a LISTO y se abrirá WhatsApp con el mensaje:'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.fondoSuperficieOf(context),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                WhatsappService.generarMensajeOrdenLista(
+                  nombreCliente: orden.cliente?.nombre ?? 'Cliente',
+                  equipo: orden.equipo?.nombreCompleto ?? 'Equipo',
+                  numeroOrden: orden.numeroOrdenDisplay,
+                ),
+                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.verdeWhatsapp),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar y Enviar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final ok = await ref
+        .read(detalleOrdenProvider(widget.ordenId).notifier)
+        .actualizarEstado('listo');
+
+    if (ok) {
+      final tel = orden.cliente?.telefono;
+      if (tel != null && tel.isNotEmpty) {
+        final msg = WhatsappService.generarMensajeOrdenLista(
+          nombreCliente: orden.cliente?.nombre ?? 'Cliente',
+          equipo: orden.equipo?.nombreCompleto ?? 'Equipo',
+          numeroOrden: orden.numeroOrdenDisplay,
+        );
+        await WhatsappService.abrirChat(telefono: tel, mensaje: msg);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(detalleOrdenProvider(widget.ordenId));
     final orden = state.orden;
 
     return Scaffold(
-      backgroundColor: AppColors.fondoPrincipal,
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       appBar: AppBar(
+        backgroundColor: AppColors.fondoPrincipalOf(context),
         title: Text(orden != null ? 'Orden ${orden.numeroOrdenDisplay}' : 'Detalle de Orden'),
         actions: [
           if (orden != null) ...[
             IconButton(
-              icon: const Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoClaro),
+              icon: const Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoPrimario),
               tooltip: 'Imprimir Stickers Térmicos',
               onPressed: () => _abrirDialogoStickers(orden),
             ),
@@ -195,42 +192,47 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               ? Center(
                   child: Text(
                     state.errorMessage ?? 'No se pudo cargar la orden.',
-                    style: const TextStyle(color: AppColors.textoSecundario),
+                    style: TextStyle(color: AppColors.textoSecundarioOf(context)),
                   ),
                 )
               : SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // ── Cabecera: N° Orden + Fecha + Estado ──
-                      _buildHeaderCard(orden),
-                      const SizedBox(height: 12),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ── Cabecera: N° Orden + Fecha + Estado ──
+                          _buildHeaderCard(orden),
+                          const SizedBox(height: 12),
 
-                      // ── Acciones Rápidas (Stickers + PDF + WA) ──
-                      _buildQuickActionsRow(orden),
-                      const SizedBox(height: 12),
+                          // ── Acciones Rápidas (Stickers + PDF + WA) ──
+                          _buildQuickActionsRow(orden),
+                          const SizedBox(height: 12),
 
-                      // ── Cliente Card ──
-                      _buildClienteCard(orden),
-                      const SizedBox(height: 12),
+                          // ── Cliente Card ──
+                          _buildClienteCard(orden),
+                          const SizedBox(height: 12),
 
-                      // ── Equipo Card ──
-                      _buildEquipoCard(orden),
-                      const SizedBox(height: 12),
+                          // ── Equipo Card ──
+                          _buildEquipoCard(orden),
+                          const SizedBox(height: 12),
 
-                      // ── Servicios Card ──
-                      _buildServiciosCard(orden),
-                      const SizedBox(height: 12),
+                          // ── Servicios Card ──
+                          _buildServiciosCard(orden),
+                          const SizedBox(height: 12),
 
-                      // ── Resumen Financiero ──
-                      _buildTotalesCard(orden),
-                      const SizedBox(height: 18),
+                          // ── Resumen Financiero ──
+                          _buildTotalesCard(orden),
+                          const SizedBox(height: 18),
 
-                      // ── Botones de Acción Operativa ──
-                      _buildActionButtons(orden),
-                      const SizedBox(height: 24),
-                    ],
+                          // ── Botones de Acción Operativa ──
+                          _buildActionButtons(orden),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
     );
@@ -260,10 +262,10 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             onPressed: _isGeneratingPdf ? null : _compartirPdf,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              side: const BorderSide(color: AppColors.fondoBorde),
+              side: BorderSide(color: AppColors.fondoBordeOf(context)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoClaro),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoPrimario),
             label: const Text(
               'Comprobante PDF',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -275,12 +277,20 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
   }
 
   Widget _buildHeaderCard(dynamic orden) {
+    final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -290,16 +300,16 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             children: [
               Text(
                 orden.numeroOrdenDisplay,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.rojoClaro,
+                  color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Creada el ${DateFormatter.formatearFechaHora(orden.createdAt)}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                style: TextStyle(fontSize: 12, color: AppColors.textoSecundarioOf(context)),
               ),
               if (orden.fechaPrometida != null)
                 Padding(
@@ -321,26 +331,34 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
   }
 
   Widget _buildClienteCard(dynamic orden) {
+    final isDark = AppColors.isDark(context);
     final cliente = orden.cliente;
     final tel = cliente?.telefono ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'DATOS DEL CLIENTE',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.0,
-              color: AppColors.textoSecundario,
+              color: AppColors.textoSecundarioOf(context),
             ),
           ),
           const SizedBox(height: 12),
@@ -348,11 +366,11 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.rojoContenedor,
+                backgroundColor: AppColors.rojoContenedorOf(context),
                 child: Text(
                   cliente?.iniciales ?? '?',
-                  style: const TextStyle(
-                    color: AppColors.rojoClaro,
+                  style: TextStyle(
+                    color: isDark ? AppColors.rojoClaro : AppColors.rojoPrimario,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -365,21 +383,21 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                   children: [
                     Text(
                       cliente?.nombreCompleto ?? 'Sin asignar',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textoPrincipal,
+                        color: AppColors.textoPrincipalOf(context),
                       ),
                     ),
                     if (cliente?.dni != null && cliente!.dni!.isNotEmpty)
                       Text(
                         'DNI: ${cliente.dni}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                        style: TextStyle(fontSize: 12, color: AppColors.textoSecundarioOf(context)),
                       ),
                     if (tel.isNotEmpty)
                       Text(
                         'Tel: $tel',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                        style: TextStyle(fontSize: 12, color: AppColors.textoSecundarioOf(context)),
                       ),
                   ],
                 ),
@@ -404,46 +422,58 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
   }
 
   Widget _buildEquipoCard(dynamic orden) {
+    final isDark = AppColors.isDark(context);
     final equipo = orden.equipo;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'DATOS DEL EQUIPO',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.0,
-              color: AppColors.textoSecundario,
+              color: AppColors.textoSecundarioOf(context),
             ),
           ),
           const SizedBox(height: 12),
           if (equipo == null)
-            const Text(
+            Text(
               'Sin equipo registrado',
-              style: TextStyle(color: AppColors.textoMuted, fontStyle: FontStyle.italic),
+              style: TextStyle(color: AppColors.textoMutedOf(context), fontStyle: FontStyle.italic),
             )
           else ...[
             Row(
               children: [
                 Icon(
                   StatusHelper.obtenerIconoEquipo(equipo.tipo),
-                  color: AppColors.rojoClaro,
+                  color: AppColors.rojoPrimario,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${equipo.tipoFormateado}: ${equipo.nombreCompleto}',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textoPrincipalOf(context),
+                    ),
                   ),
                 ),
               ],
@@ -457,14 +487,14 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               _buildDataRow('Accesorios Registrados', equipo.accesorios!),
             if (equipo.desperfecto != null && equipo.desperfecto!.isNotEmpty) ...[
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Problema / Falla reportada:',
-                style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+                style: TextStyle(fontSize: 12, color: AppColors.textoSecundarioOf(context)),
               ),
               const SizedBox(height: 2),
               Text(
                 equipo.desperfecto!,
-                style: const TextStyle(fontSize: 13, color: AppColors.textoPrincipal),
+                style: TextStyle(fontSize: 13, color: AppColors.textoPrincipalOf(context)),
               ),
             ],
           ],
@@ -474,32 +504,40 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
   }
 
   Widget _buildServiciosCard(dynamic orden) {
+    final isDark = AppColors.isDark(context);
     final items = orden.itemsServicio;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'SERVICIOS Y REPUESTOS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.0,
-              color: AppColors.textoSecundario,
+              color: AppColors.textoSecundarioOf(context),
             ),
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            const Text(
+            Text(
               'No hay servicios asociados',
-              style: TextStyle(color: AppColors.textoMuted, fontStyle: FontStyle.italic),
+              style: TextStyle(color: AppColors.textoMutedOf(context), fontStyle: FontStyle.italic),
             )
           else
             ...items.map(
@@ -511,7 +549,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                     Expanded(
                       child: Text(
                         '${item.cantidad}x  ${item.servicio?.nombre ?? "Servicio"}',
-                        style: const TextStyle(fontSize: 13),
+                        style: TextStyle(fontSize: 13, color: AppColors.textoPrincipalOf(context)),
                       ),
                     ),
                     Text(
@@ -528,25 +566,37 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
   }
 
   Widget _buildTotalesCard(dynamic orden) {
+    final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
           _buildFinancialRow('Subtotal', CurrencyFormatter.format(orden.subtotal)),
           _buildFinancialRow('Descuento', '- ${CurrencyFormatter.format(orden.descuento)}'),
           _buildFinancialRow('Adelantos', '- ${CurrencyFormatter.format(orden.adelanto)}'),
-          const Divider(height: 16, color: AppColors.fondoBorde),
+          Divider(height: 16, color: AppColors.fondoBordeOf(context)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'TOTAL A COBRAR',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textoPrincipalOf(context),
+                ),
               ),
               Text(
                 CurrencyFormatter.format(orden.saldoPendiente),
@@ -571,12 +621,12 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
           icon: const Icon(Icons.check_circle_outline_rounded),
           label: const Text('MARCAR LISTA Y AVISAR POR WHATSAPP'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.tertiaryContainer,
-            foregroundColor: AppColors.tertiary,
+            backgroundColor: AppColors.verdeWhatsappFondoOf(context),
+            foregroundColor: AppColors.verdeWhatsapp,
             minimumSize: const Size.fromHeight(48),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.tertiary.withValues(alpha: 0.4)),
+              side: BorderSide(color: AppColors.verdeWhatsapp.withValues(alpha: 0.4)),
             ),
           ),
           onPressed: _marcarListoYAvisar,
@@ -612,11 +662,15 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text('$label: ', style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          Text('$label: ', style: TextStyle(fontSize: 12, color: AppColors.textoSecundarioOf(context))),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textoPrincipalOf(context),
+              ),
             ),
           ),
         ],
@@ -630,8 +684,15 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(fontSize: 13, color: AppColors.textoSecundarioOf(context))),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textoPrincipalOf(context),
+            ),
+          ),
         ],
       ),
     );

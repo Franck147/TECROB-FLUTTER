@@ -33,6 +33,8 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+
     final screens = [
       DashboardScreen(onNavigateToOrdenes: () => navegarA(1)),
       const OrdenesScreen(),
@@ -42,19 +44,20 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       body: IndexedStack(
         index: _currentIndex,
         children: screens,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: AppColors.fondoTarjeta,
-          border: const Border(
-            top: BorderSide(color: AppColors.fondoBorde, width: 1.2),
+          color: AppColors.fondoTarjetaOf(context),
+          border: Border(
+            top: BorderSide(color: AppColors.fondoBordeOf(context), width: 1.2),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -67,12 +70,14 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(
+                  context: context,
                   index: 0,
                   icon: Icons.space_dashboard_outlined,
                   activeIcon: Icons.space_dashboard_rounded,
                   label: 'Dashboard',
                 ),
                 _buildNavItem(
+                  context: context,
                   index: 1,
                   icon: Icons.receipt_long_outlined,
                   activeIcon: Icons.receipt_long_rounded,
@@ -81,12 +86,14 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
                 // Botón Central Destacado: Nueva Orden
                 _buildCenterActionButton(),
                 _buildNavItem(
+                  context: context,
                   index: 3,
                   icon: Icons.inventory_2_outlined,
                   activeIcon: Icons.inventory_2_rounded,
                   label: 'Catálogo',
                 ),
                 _buildNavItem(
+                  context: context,
                   index: 4,
                   icon: Icons.tune_outlined,
                   activeIcon: Icons.tune_rounded,
@@ -101,6 +108,7 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
   }
 
   Widget _buildNavItem({
+    required BuildContext context,
     required int index,
     required IconData icon,
     required IconData activeIcon,
@@ -125,14 +133,14 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
           children: [
             Icon(
               isSelected ? activeIcon : icon,
-              color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundario,
+              color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
               size: 22,
             ),
             const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundario,
+                color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),

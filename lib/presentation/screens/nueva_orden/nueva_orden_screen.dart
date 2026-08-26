@@ -367,10 +367,10 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.fondoTarjeta,
+        backgroundColor: AppColors.fondoTarjetaOf(context),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppColors.fondoBorde, width: 1.2),
+          side: BorderSide(color: AppColors.fondoBordeOf(context), width: 1.2),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -378,7 +378,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.tertiaryContainer,
+                color: AppColors.tertiary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.4)),
               ),
@@ -387,17 +387,17 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
             const SizedBox(height: 16),
             Text(
               '¡Orden ${orden.codigoVisual} Registrada!',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textoPrincipal,
+                color: AppColors.textoPrincipalOf(context),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               'Cliente: ${orden.clienteNombreCompleto}\n${orden.equipo?.nombreCompleto ?? ""}',
-              style: const TextStyle(fontSize: 12.5, color: AppColors.textoSecundario),
+              style: TextStyle(fontSize: 12.5, color: AppColors.textoSecundarioOf(context)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -491,8 +491,9 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.fondoPrincipal,
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       appBar: AppBar(
+        backgroundColor: AppColors.fondoPrincipalOf(context),
         title: const Text('Nueva Orden de Servicio'),
       ),
       body: SingleChildScrollView(
@@ -514,7 +515,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.fondoSuperficie,
+                          color: AppColors.fondoSuperficieOf(context),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.5)),
                         ),
@@ -998,12 +999,20 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     required IconData icono,
     required Widget child,
   }) {
+    final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1014,11 +1023,11 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
               const SizedBox(width: 8),
               Text(
                 titulo,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: AppColors.textoPrincipal,
+                  color: AppColors.textoPrincipalOf(context),
                 ),
               ),
             ],

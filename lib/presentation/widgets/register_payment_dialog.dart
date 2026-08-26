@@ -62,13 +62,22 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      backgroundColor: AppColors.fondoTarjetaOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.fondoBordeOf(context)),
+      ),
+      title: Row(
         children: [
-          Icon(Icons.payment, color: AppColors.rojoPrimario, size: 22),
-          SizedBox(width: 8),
+          const Icon(Icons.payment_rounded, color: AppColors.rojoPrimario, size: 22),
+          const SizedBox(width: 8),
           Text(
             'Registrar Pago',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textoPrincipalOf(context),
+            ),
           ),
         ],
       ),
@@ -84,7 +93,7 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
                 label: 'Monto (S/) *',
                 hint: '0.00',
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                prefixIcon: Icons.attach_money,
+                prefixIcon: Icons.attach_money_rounded,
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
                     return 'Ingresa un monto';
@@ -97,9 +106,9 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Método de pago:',
-                style: TextStyle(fontSize: 13, color: AppColors.textoSecundario),
+                style: TextStyle(fontSize: 13, color: AppColors.textoSecundarioOf(context)),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -125,7 +134,7 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
                 controller: _notaController,
                 label: 'Nota / Referencia (opcional)',
                 hint: 'Ej. N° de operación Yape...',
-                prefixIcon: Icons.notes,
+                prefixIcon: Icons.notes_rounded,
                 maxLines: 2,
               ),
             ],
@@ -135,10 +144,14 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
         ),
         ElevatedButton(
           onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.rojoPrimario,
+            foregroundColor: Colors.white,
+          ),
           child: const Text('Registrar'),
         ),
       ],

@@ -39,15 +39,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final dashboardState = ref.watch(dashboardProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = AppColors.isDark(context);
 
     final nombreTecnico = authState.tecnico?.nombre ?? 'Técnico';
     final rolTecnico = authState.tecnico?.esAdmin == true ? 'Administrador' : 'Técnico';
     final fechaHoy = DateFormatter.obtenerFechaHoy();
 
     return Scaffold(
-      backgroundColor: AppColors.fondoPrincipal,
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       appBar: AppBar(
-        backgroundColor: AppColors.fondoPrincipal,
+        backgroundColor: AppColors.fondoPrincipalOf(context),
         elevation: 0,
         title: Row(
           children: [
@@ -80,11 +82,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 children: [
                   Text(
                     'Panel Ejecutivo • $nombreTecnico',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textoPrincipalOf(context),
+                    ),
                   ),
                   Text(
                     '$rolTecnico • $fechaHoy',
-                    style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textoSecundarioOf(context),
+                    ),
                   ),
                 ],
               ),
@@ -92,8 +101,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
         actions: [
+          // Botón Rápido de Cambio de Tema (Modo Claro / Modo Oscuro)
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.textoSecundario),
+            icon: Icon(
+              themeMode == ThemeMode.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: themeMode == ThemeMode.dark ? AppColors.secondary : AppColors.rojoPrimario,
+            ),
+            tooltip: themeMode == ThemeMode.dark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro',
+            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: AppColors.textoSecundarioOf(context)),
             tooltip: 'Actualizar métricas',
             onPressed: _cargarDatos,
           ),
@@ -103,278 +121,175 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: RefreshIndicator(
         onRefresh: () async => _cargarDatos(),
         color: AppColors.rojoPrimario,
-        backgroundColor: AppColors.fondoTarjeta,
+        backgroundColor: AppColors.fondoTarjetaOf(context),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ══════════════════════════════════════════════════════════════
-              //  1. CENTRO FINANCIERO Y KPIS ECONÓMICOS
-              // ══════════════════════════════════════════════════════════════
-              Row(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _buildFinancialCard(
-                      titulo: 'Ingresos Registrados',
-                      valor: CurrencyFormatter.format(dashboardState.totalIngresos),
-                      icono: Icons.attach_money_rounded,
-                      color: AppColors.tertiary,
-                      detalle: '${dashboardState.totalOrdenes} órdenes totales',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildFinancialCard(
-                      titulo: 'Por Cobrar en Taller',
-                      valor: CurrencyFormatter.format(dashboardState.cuentasPorCobrar),
-                      icono: Icons.account_balance_wallet_rounded,
-                      color: AppColors.secondary,
-                      detalle: '${dashboardState.activasCount} órdenes activas',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildFinancialCard(
-                      titulo: 'Equipos Reparados',
-                      valor: '${dashboardState.equiposReparados}',
-                      icono: Icons.task_alt_rounded,
-                      color: AppColors.estadoListoTexto,
-                      detalle: 'Listos / Entregados',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildFinancialCard(
-                      titulo: 'Ticket Promedio',
-                      valor: CurrencyFormatter.format(dashboardState.ticketPromedio),
-                      icono: Icons.receipt_long_rounded,
-                      color: AppColors.rojoClaro,
-                      detalle: 'Promedio por orden',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-
-              // ══════════════════════════════════════════════════════════════
-              //  2. ALERTA: EQUIPOS LISTOS PARA ENTREGA (WHATSAPP)
-              // ══════════════════════════════════════════════════════════════
-              if (dashboardState.ordenesListasParaEntrega.isNotEmpty) ...[
-                _buildSectionTitle(
-                  'EQUIPOS LISTOS POR RECOGER (${dashboardState.ordenesListasParaEntrega.length})',
-                  Icons.notifications_active_rounded,
-                  color: AppColors.verdeWhatsapp,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.fondoTarjeta,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.verdeWhatsapp.withValues(alpha: 0.35)),
-                  ),
-                  child: Column(
-                    children: dashboardState.ordenesListasParaEntrega.map((orden) {
-                      final cliente = orden.cliente;
-                      final tel = cliente?.telefono ?? '';
-                      final equipo = orden.equipo?.nombreCompleto ?? 'Equipo';
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: AppColors.verdeWhatsappFondo,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppColors.verdeWhatsapp,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${orden.codigoVisual} • ${orden.clienteNombreCompleto}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: AppColors.textoPrincipal,
-                                    ),
-                                  ),
-                                  Text(
-                                    '$equipo • Saldo: ${CurrencyFormatter.format(orden.saldoPendiente)}',
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: AppColors.textoSecundario,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                if (tel.isNotEmpty) {
-                                  final msg = WhatsappService.generarMensajeOrdenLista(
-                                    nombreCliente: orden.clienteNombreCompleto,
-                                    equipo: equipo,
-                                    numeroOrden: orden.codigoVisual,
-                                  );
-                                  WhatsappService.abrirChat(telefono: tel, mensaje: msg);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('El cliente no tiene teléfono registrado')),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.verdeWhatsapp,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                visualDensity: VisualDensity.compact,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: const Icon(Icons.chat_rounded, size: 14),
-                              label: const Text('Avisar WA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
+                  // ══════════════════════════════════════════════════════════════
+                  //  1. CENTRO FINANCIERO Y KPIS ECONÓMICOS
+                  // ══════════════════════════════════════════════════════════════
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildFinancialCard(
+                          context: context,
+                          titulo: 'Ingresos Registrados',
+                          valor: CurrencyFormatter.format(dashboardState.totalIngresos),
+                          icono: Icons.attach_money_rounded,
+                          color: AppColors.tertiary,
+                          detalle: '${dashboardState.totalOrdenes} órdenes totales',
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 22),
-              ],
-
-              // ══════════════════════════════════════════════════════════════
-              //  3. DISTRIBUCIÓN DEL EMBUDO DE TRABAJO DEL TALLER
-              // ══════════════════════════════════════════════════════════════
-              _buildSectionTitle('ESTADO DEL TALLER', Icons.donut_large_rounded),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.fondoTarjeta,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.fondoBorde),
-                ),
-                child: Column(
-                  children: [
-                    _buildStatusProgressRow(
-                      estado: 'pendiente',
-                      etiqueta: 'Por Diagnosticar / Pendientes',
-                      cantidad: dashboardState.distribucionEstados['pendiente'] ?? 0,
-                      total: dashboardState.totalOrdenes,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStatusProgressRow(
-                      estado: 'diagnostico',
-                      etiqueta: 'En Diagnóstico',
-                      cantidad: dashboardState.distribucionEstados['diagnostico'] ?? 0,
-                      total: dashboardState.totalOrdenes,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStatusProgressRow(
-                      estado: 'en_progreso',
-                      etiqueta: 'En Reparación / Progreso',
-                      cantidad: dashboardState.distribucionEstados['en_progreso'] ?? 0,
-                      total: dashboardState.totalOrdenes,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStatusProgressRow(
-                      estado: 'listo',
-                      etiqueta: 'Listos para Retiro',
-                      cantidad: dashboardState.distribucionEstados['listo'] ?? 0,
-                      total: dashboardState.totalOrdenes,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStatusProgressRow(
-                      estado: 'entregado',
-                      etiqueta: 'Entregados al Cliente',
-                      cantidad: dashboardState.distribucionEstados['entregado'] ?? 0,
-                      total: dashboardState.totalOrdenes,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // ══════════════════════════════════════════════════════════════
-              //  4. TIPOS DE EQUIPO ATENDIDOS
-              // ══════════════════════════════════════════════════════════════
-              _buildSectionTitle('EQUIPOS ATENDIDOS EN TALLER', Icons.devices_rounded),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.fondoTarjeta,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.fondoBorde),
-                ),
-                child: dashboardState.distribucionTiposEquipo.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No hay equipos registrados aún',
-                          style: TextStyle(color: AppColors.textoSecundario, fontSize: 13),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildFinancialCard(
+                          context: context,
+                          titulo: 'Por Cobrar en Taller',
+                          valor: CurrencyFormatter.format(dashboardState.cuentasPorCobrar),
+                          icono: Icons.account_balance_wallet_rounded,
+                          color: AppColors.secondary,
+                          detalle: '${dashboardState.activasCount} órdenes activas',
                         ),
-                      )
-                    : Column(
-                        children: dashboardState.distribucionTiposEquipo.entries.map((entry) {
-                          final tipo = entry.key;
-                          final cant = entry.value;
-                          final total = dashboardState.totalOrdenes;
-                          final pct = total > 0 ? (cant / total) : 0.0;
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildFinancialCard(
+                          context: context,
+                          titulo: 'Equipos Reparados',
+                          valor: '${dashboardState.equiposReparados}',
+                          icono: Icons.task_alt_rounded,
+                          color: isDark ? AppColors.estadoListoTexto : AppColors.estadoListoTextoClaro,
+                          detalle: 'Listos / Entregados',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildFinancialCard(
+                          context: context,
+                          titulo: 'Ticket Promedio',
+                          valor: CurrencyFormatter.format(dashboardState.ticketPromedio),
+                          icono: Icons.receipt_long_rounded,
+                          color: AppColors.rojoPrimario,
+                          detalle: 'Promedio por orden',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+
+                  // ══════════════════════════════════════════════════════════════
+                  //  2. ALERTA: EQUIPOS LISTOS PARA ENTREGA (WHATSAPP)
+                  // ══════════════════════════════════════════════════════════════
+                  if (dashboardState.ordenesListasParaEntrega.isNotEmpty) ...[
+                    _buildSectionTitle(
+                      context,
+                      'EQUIPOS LISTOS POR RECOGER (${dashboardState.ordenesListasParaEntrega.length})',
+                      Icons.notifications_active_rounded,
+                      color: AppColors.verdeWhatsapp,
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.fondoTarjetaOf(context),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.verdeWhatsapp.withValues(alpha: isDark ? 0.35 : 0.4),
+                          width: 1.1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.25)
+                                : AppColors.verdeWhatsapp.withValues(alpha: 0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: dashboardState.ordenesListasParaEntrega.map((orden) {
+                          final cliente = orden.cliente;
+                          final tel = cliente?.telefono ?? '';
+                          final equipo = orden.equipo?.nombreCompleto ?? 'Equipo';
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            padding: const EdgeInsets.symmetric(vertical: 7),
                             child: Row(
                               children: [
-                                Icon(
-                                  StatusHelper.obtenerIconoEquipo(tipo),
-                                  size: 18,
-                                  color: AppColors.rojoClaro,
-                                ),
-                                const SizedBox(width: 10),
-                                SizedBox(
-                                  width: 100,
-                                  child: Text(
-                                    StatusHelper.obtenerTipoEquipoTexto(tipo),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.verdeWhatsappFondoOf(context),
+                                    shape: BoxShape.circle,
                                   ),
-                                ),
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: LinearProgressIndicator(
-                                      value: pct,
-                                      minHeight: 8,
-                                      backgroundColor: AppColors.fondoSuperficie,
-                                      color: AppColors.rojoPrimario,
-                                    ),
+                                  child: const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: AppColors.verdeWhatsapp,
+                                    size: 18,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  '$cant (${(pct * 100).toStringAsFixed(0)}%)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textoSecundario,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${orden.codigoVisual} • ${orden.clienteNombreCompleto}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13.5,
+                                          color: AppColors.textoPrincipalOf(context),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '$equipo • Saldo: ${CurrencyFormatter.format(orden.saldoPendiente)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textoSecundarioOf(context),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    if (tel.isNotEmpty) {
+                                      final msg = WhatsappService.generarMensajeOrdenLista(
+                                        nombreCliente: orden.clienteNombreCompleto,
+                                        equipo: equipo,
+                                        numeroOrden: orden.codigoVisual,
+                                      );
+                                      WhatsappService.abrirChat(telefono: tel, mensaje: msg);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('El cliente no tiene teléfono registrado')),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.verdeWhatsapp,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 1,
+                                  ),
+                                  icon: const Icon(Icons.chat_rounded, size: 14),
+                                  label: const Text(
+                                    'Avisar WA',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -382,19 +297,156 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           );
                         }).toList(),
                       ),
+                    ),
+                    const SizedBox(height: 22),
+                  ],
+
+                  // ══════════════════════════════════════════════════════════════
+                  //  3. DISTRIBUCIÓN DEL EMBUDO DE TRABAJO DEL TALLER
+                  // ══════════════════════════════════════════════════════════════
+                  _buildSectionTitle(context, 'ESTADO DEL TALLER', Icons.donut_large_rounded),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.fondoTarjetaOf(context),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.fondoBordeOf(context)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildStatusProgressRow(
+                          context: context,
+                          estado: 'pendiente',
+                          etiqueta: 'Por Diagnosticar / Pendientes',
+                          cantidad: dashboardState.distribucionEstados['pendiente'] ?? 0,
+                          total: dashboardState.totalOrdenes,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildStatusProgressRow(
+                          context: context,
+                          estado: 'diagnostico',
+                          etiqueta: 'En Diagnóstico',
+                          cantidad: dashboardState.distribucionEstados['diagnostico'] ?? 0,
+                          total: dashboardState.totalOrdenes,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildStatusProgressRow(
+                          context: context,
+                          estado: 'en_progreso',
+                          etiqueta: 'En Reparación / Progreso',
+                          cantidad: dashboardState.distribucionEstados['en_progreso'] ?? 0,
+                          total: dashboardState.totalOrdenes,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildStatusProgressRow(
+                          context: context,
+                          estado: 'listo',
+                          etiqueta: 'Listos para Retiro',
+                          cantidad: dashboardState.distribucionEstados['listo'] ?? 0,
+                          total: dashboardState.totalOrdenes,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildStatusProgressRow(
+                          context: context,
+                          estado: 'entregado',
+                          etiqueta: 'Entregados al Cliente',
+                          cantidad: dashboardState.distribucionEstados['entregado'] ?? 0,
+                          total: dashboardState.totalOrdenes,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // ══════════════════════════════════════════════════════════════
+                  //  4. TIPOS DE EQUIPO ATENDIDOS
+                  // ══════════════════════════════════════════════════════════════
+                  _buildSectionTitle(context, 'EQUIPOS ATENDIDOS EN TALLER', Icons.devices_rounded),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.fondoTarjetaOf(context),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.fondoBordeOf(context)),
+                    ),
+                    child: dashboardState.distribucionTiposEquipo.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No hay equipos registrados aún',
+                              style: TextStyle(color: AppColors.textoSecundarioOf(context), fontSize: 13),
+                            ),
+                          )
+                        : Column(
+                            children: dashboardState.distribucionTiposEquipo.entries.map((entry) {
+                              final tipo = entry.key;
+                              final cant = entry.value;
+                              final total = dashboardState.totalOrdenes;
+                              final pct = total > 0 ? (cant / total) : 0.0;
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      StatusHelper.obtenerIconoEquipo(tipo),
+                                      size: 18,
+                                      color: AppColors.rojoPrimario,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    SizedBox(
+                                      width: 110,
+                                      child: Text(
+                                        StatusHelper.obtenerTipoEquipoTexto(tipo),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textoPrincipalOf(context),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: LinearProgressIndicator(
+                                          value: pct,
+                                          minHeight: 8,
+                                          backgroundColor: AppColors.fondoSuperficieOf(context),
+                                          color: AppColors.rojoPrimario,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      '$cant (${(pct * 100).toStringAsFixed(0)}%)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textoSecundarioOf(context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon, {Color color = AppColors.textoPrincipal}) {
+  Widget _buildSectionTitle(BuildContext context, String title, IconData icon, {Color? color}) {
+    final titleColor = color ?? AppColors.textoPrincipalOf(context);
     return Row(
       children: [
-        Icon(icon, size: 16, color: color),
+        Icon(icon, size: 16, color: titleColor),
         const SizedBox(width: 6),
         Text(
           title,
@@ -402,7 +454,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.8,
-            color: color,
+            color: titleColor,
           ),
         ),
       ],
@@ -410,21 +462,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildFinancialCard({
+    required BuildContext context,
     required String titulo,
     required String valor,
     required IconData icono,
     required Color color,
     required String detalle,
   }) {
+    final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -436,18 +490,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                titulo,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textoSecundario,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textoSecundarioOf(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: color.withValues(alpha: isDark ? 0.12 : 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icono, color: color, size: 16),
@@ -466,9 +524,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 2),
           Text(
             detalle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10.5,
-              color: AppColors.textoMuted,
+              color: AppColors.textoMutedOf(context),
             ),
           ),
         ],
@@ -477,12 +535,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildStatusProgressRow({
+    required BuildContext context,
     required String estado,
     required String etiqueta,
     required int cantidad,
     required int total,
   }) {
-    final color = StatusHelper.obtenerColorTexto(estado);
+    final isDark = AppColors.isDark(context);
+    final color = StatusHelper.obtenerColorTexto(estado, isDark: isDark);
     final pct = total > 0 ? (cantidad / total) : 0.0;
 
     return Column(
@@ -501,7 +561,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 const SizedBox(width: 8),
                 Text(
                   etiqueta,
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textoPrincipalOf(context),
+                  ),
                 ),
               ],
             ),
@@ -517,7 +581,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: LinearProgressIndicator(
             value: pct,
             minHeight: 6,
-            backgroundColor: AppColors.fondoSuperficie,
+            backgroundColor: AppColors.fondoSuperficieOf(context),
             color: color,
           ),
         ),

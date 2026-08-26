@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/utils/status_helper.dart';
 
 class ChangeStatusDialog extends StatelessWidget {
@@ -13,18 +14,29 @@ class ChangeStatusDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+
     return AlertDialog(
-      title: const Text(
+      backgroundColor: AppColors.fondoTarjetaOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.fondoBordeOf(context)),
+      ),
+      title: Text(
         'Cambiar Estado de la Orden',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textoPrincipalOf(context),
+        ),
       ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: StatusHelper.todosLosEstados.map((estado) {
             final isCurrent = estado == estadoActual;
-            final colorTexto = StatusHelper.obtenerColorTexto(estado);
-            final colorFondo = StatusHelper.obtenerColorFondo(estado);
+            final colorTexto = StatusHelper.obtenerColorTexto(estado, isDark: isDark);
+            final colorFondo = StatusHelper.obtenerColorFondo(estado, isDark: isDark);
             final label = StatusHelper.obtenerTexto(estado);
 
             return ListTile(
@@ -40,12 +52,12 @@ class ChangeStatusDialog extends StatelessWidget {
               title: Text(
                 label,
                 style: TextStyle(
-                  color: isCurrent ? colorTexto : Colors.white,
+                  color: isCurrent ? colorTexto : AppColors.textoPrincipalOf(context),
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               trailing: isCurrent
-                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                  ? Icon(Icons.check_rounded, color: colorTexto, size: 20)
                   : null,
               tileColor: isCurrent ? colorFondo : null,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -62,7 +74,7 @@ class ChangeStatusDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
         ),
       ],
     );

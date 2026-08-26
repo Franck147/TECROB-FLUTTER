@@ -64,7 +64,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
     );
   }
 
-  void _confirmarEliminar(ServicioCatalogoModel servicio) {
+  void _confirmarEliminar(ServicioCatalogoModel serv) {
     final auth = ref.read(authProvider);
     final empresaId = auth.tecnico?.empresaId;
     if (empresaId == null) return;
@@ -72,23 +72,23 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.fondoTarjeta,
+        backgroundColor: AppColors.fondoTarjetaOf(context),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.fondoBorde),
+          side: BorderSide(color: AppColors.fondoBordeOf(context)),
         ),
         title: const Text('Eliminar Servicio'),
-        content: Text('¿Estás seguro de eliminar "${servicio.nombre}"?'),
+        content: Text('¿Estás seguro de que deseas eliminar "${serv.nombre}" del catálogo?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await ref.read(catalogoProvider.notifier).eliminarServicio(servicio.id, empresaId);
+              await ref.read(catalogoProvider.notifier).eliminarServicio(serv.id, empresaId);
             },
             child: const Text('Eliminar'),
           ),
@@ -100,32 +100,39 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
   @override
   Widget build(BuildContext context) {
     final catalogoState = ref.watch(catalogoProvider);
+    final isDark = AppColors.isDark(context);
 
     return Scaffold(
-      backgroundColor: AppColors.fondoPrincipal,
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       appBar: AppBar(
+        backgroundColor: AppColors.fondoPrincipalOf(context),
         title: const Text('Catálogo de Servicios'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_rounded),
-            tooltip: 'Nuevo Servicio',
-            onPressed: () => _abrirDialogoServicio(),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Actualizar catálogo',
+            onPressed: _cargarServicios,
           ),
           const SizedBox(width: 4),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _abrirDialogoServicio(),
+        backgroundColor: AppColors.rojoPrimario,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Nuevo Servicio', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
       body: Column(
         children: [
-          // Búsqueda
+          // Barra de búsqueda
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: TextField(
               controller: _searchController,
-              onChanged: (val) {
-                ref.read(catalogoProvider.notifier).setBusqueda(val);
-              },
+              onChanged: (val) => ref.read(catalogoProvider.notifier).setBusqueda(val),
               decoration: InputDecoration(
-                hintText: 'Buscar servicios o repuestos...',
+                hintText: 'Buscar servicio o repuesto...',
                 prefixIcon: const Icon(Icons.search_rounded, size: 22),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -140,7 +147,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
             ),
           ),
 
-          // Chips de Categorías
+          // Filtros de Categoría
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -172,14 +179,14 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
             child: RefreshIndicator(
               onRefresh: () async => _cargarServicios(),
               color: AppColors.rojoPrimario,
-              backgroundColor: AppColors.fondoTarjeta,
+              backgroundColor: AppColors.fondoTarjetaOf(context),
               child: catalogoState.isLoading && catalogoState.todosLosServicios.isEmpty
                   ? const Center(child: CircularProgressIndicator(color: AppColors.rojoPrimario))
                   : catalogoState.serviciosFiltrados.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'No se encontraron servicios',
-                            style: TextStyle(color: AppColors.textoSecundario),
+                            style: TextStyle(color: AppColors.textoSecundarioOf(context)),
                           ),
                         )
                       : ListView.separated(
@@ -190,23 +197,37 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                             final serv = catalogoState.serviciosFiltrados[index];
                             return Container(
                               decoration: BoxDecoration(
-                                color: AppColors.fondoTarjeta,
+                                color: AppColors.fondoTarjetaOf(context),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.fondoBorde),
+                                border: Border.all(color: AppColors.fondoBordeOf(context)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: ListTile(
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.rojoContenedor,
+                                    color: AppColors.rojoContenedorOf(context),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.handyman_rounded,
-                                      color: AppColors.rojoClaro, size: 18),
+                                  child: Icon(
+                                    Icons.handyman_rounded,
+                                    color: isDark ? AppColors.rojoClaro : AppColors.rojoPrimario,
+                                    size: 18,
+                                  ),
                                 ),
                                 title: Text(
                                   serv.nombre,
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: AppColors.textoPrincipalOf(context),
+                                  ),
                                 ),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,7 +235,10 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                                     if (serv.descripcion != null && serv.descripcion!.isNotEmpty)
                                       Text(
                                         serv.descripcion!,
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textoMuted),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textoMutedOf(context),
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -229,35 +253,39 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                                   children: [
                                     Text(
                                       serv.precioFormateado,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14.5,
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.rojoClaro,
+                                        color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert_rounded, size: 18),
-                                      color: AppColors.fondoSuperficie,
+                                      icon: Icon(
+                                        Icons.more_vert_rounded,
+                                        size: 18,
+                                        color: AppColors.textoSecundarioOf(context),
+                                      ),
+                                      color: AppColors.fondoTarjetaOf(context),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(10),
-                                        side: const BorderSide(color: AppColors.fondoBorde),
+                                        side: BorderSide(color: AppColors.fondoBordeOf(context)),
                                       ),
                                       onSelected: (val) {
                                         if (val == 'edit') _abrirDialogoServicio(serv);
                                         if (val == 'delete') _confirmarEliminar(serv);
                                       },
-                                      itemBuilder: (ctx) => const [
+                                      itemBuilder: (ctx) => [
                                         PopupMenuItem(
                                           value: 'edit',
                                           child: Row(
                                             children: [
-                                              Icon(Icons.edit_rounded, size: 16, color: AppColors.textoPrincipal),
-                                              SizedBox(width: 8),
-                                              Text('Editar'),
+                                              Icon(Icons.edit_rounded, size: 16, color: AppColors.textoPrincipalOf(context)),
+                                              const SizedBox(width: 8),
+                                              const Text('Editar'),
                                             ],
                                           ),
                                         ),
-                                        PopupMenuItem(
+                                        const PopupMenuItem(
                                           value: 'delete',
                                           child: Row(
                                             children: [

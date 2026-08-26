@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import 'custom_text_field.dart';
 
 class CreateTecnicoDialog extends StatefulWidget {
@@ -52,9 +53,18 @@ class _CreateTecnicoDialogState extends State<CreateTecnicoDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text(
+      backgroundColor: AppColors.fondoTarjetaOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.fondoBordeOf(context)),
+      ),
+      title: Text(
         'Nuevo Técnico',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textoPrincipalOf(context),
+        ),
       ),
       content: SingleChildScrollView(
         child: Form(
@@ -107,6 +117,7 @@ class _CreateTecnicoDialogState extends State<CreateTecnicoDialog> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     size: 20,
+                    color: AppColors.textoSecundarioOf(context),
                   ),
                   onPressed: () {
                     setState(() {
@@ -123,13 +134,20 @@ class _CreateTecnicoDialogState extends State<CreateTecnicoDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _rolSeleccionado,
+                dropdownColor: AppColors.fondoTarjetaOf(context),
                 decoration: const InputDecoration(
                   labelText: 'Rol en el Sistema *',
                   prefixIcon: Icon(Icons.admin_panel_settings_outlined, size: 20),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'tecnico', child: Text('Técnico')),
-                  DropdownMenuItem(value: 'administrador', child: Text('Administrador')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'tecnico',
+                    child: Text('Técnico', style: TextStyle(color: AppColors.textoPrincipalOf(context))),
+                  ),
+                  DropdownMenuItem(
+                    value: 'administrador',
+                    child: Text('Administrador', style: TextStyle(color: AppColors.textoPrincipalOf(context))),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -146,10 +164,14 @@ class _CreateTecnicoDialogState extends State<CreateTecnicoDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
         ),
         ElevatedButton(
           onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.rojoPrimario,
+            foregroundColor: Colors.white,
+          ),
           child: const Text('Crear Usuario'),
         ),
       ],

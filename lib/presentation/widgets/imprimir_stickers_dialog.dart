@@ -61,12 +61,13 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
   @override
   Widget build(BuildContext context) {
     final cantidad = _indicesSeleccionados.length;
+    final isDark = AppColors.isDark(context);
 
     return Dialog(
-      backgroundColor: AppColors.fondoTarjeta,
+      backgroundColor: AppColors.fondoTarjetaOf(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AppColors.fondoBorde, width: 1.2),
+        side: BorderSide(color: AppColors.fondoBordeOf(context), width: 1.2),
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
@@ -82,9 +83,11 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.rojoContenedor,
+                    color: AppColors.rojoContenedorOf(context),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.rojoPrimario.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppColors.rojoPrimario.withValues(alpha: isDark ? 0.3 : 0.2),
+                    ),
                   ),
                   child: const Icon(
                     Icons.bluetooth_audio_rounded,
@@ -97,18 +100,18 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Imprimir Stickers Térmicos',
                         style: TextStyle(
-                          color: AppColors.textoPrincipal,
+                          color: AppColors.textoPrincipalOf(context),
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         'Orden ${widget.orden.codigoVisual} • Rotulado de accesorios',
-                        style: const TextStyle(
-                          color: AppColors.textoSecundario,
+                        style: TextStyle(
+                          color: AppColors.textoSecundarioOf(context),
                           fontSize: 12,
                         ),
                       ),
@@ -117,7 +120,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textoSecundario),
+                  icon: Icon(Icons.close_rounded, color: AppColors.textoSecundarioOf(context)),
                   splashRadius: 20,
                 ),
               ],
@@ -125,16 +128,17 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
 
             const SizedBox(height: 18),
 
-            // Vista previa estilo Sticker Adhesivo
+            // Vista previa estilo Sticker Adhesivo Físico
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFFBFBFB),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -227,10 +231,10 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Etiquetas para imprimir:',
                   style: TextStyle(
-                    color: AppColors.textoPrincipal,
+                    color: AppColors.textoPrincipalOf(context),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -280,12 +284,14 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.fondoSuperficie : AppColors.fondoPrincipal,
+                        color: isSelected
+                            ? (isDark ? AppColors.fondoSuperficieOf(context) : AppColors.rojoContenedorClaro)
+                            : AppColors.fondoPrincipalOf(context),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isSelected
                               ? AppColors.rojoPrimario.withValues(alpha: 0.5)
-                              : AppColors.fondoBorde,
+                              : AppColors.fondoBordeOf(context),
                         ),
                       ),
                       child: Row(
@@ -294,7 +300,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                             isSelected
                                 ? Icons.check_box_rounded
                                 : Icons.check_box_outline_blank_rounded,
-                            color: isSelected ? AppColors.rojoPrimario : AppColors.textoMuted,
+                            color: isSelected ? AppColors.rojoPrimario : AppColors.textoMutedOf(context),
                             size: 20,
                           ),
                           const SizedBox(width: 10),
@@ -307,7 +313,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                                   style: TextStyle(
                                     color: item.esPrincipal
                                         ? AppColors.rojoPrimario
-                                        : AppColors.textoPrincipal,
+                                        : AppColors.textoPrincipalOf(context),
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -316,17 +322,17 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                                   item.subtitulo,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.textoSecundario,
+                                  style: TextStyle(
+                                    color: AppColors.textoSecundarioOf(context),
                                     fontSize: 11,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const Icon(
+                          Icon(
                             Icons.sell_outlined,
-                            color: AppColors.textoMuted,
+                            color: AppColors.textoMutedOf(context),
                             size: 16,
                           ),
                         ],
@@ -351,7 +357,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 4,
+                  elevation: 2,
                   shadowColor: AppColors.rojoPrimario.withValues(alpha: 0.4),
                 ),
                 icon: _imprimiendo

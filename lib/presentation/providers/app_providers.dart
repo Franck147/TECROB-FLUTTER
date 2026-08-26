@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -798,3 +798,26 @@ final configuracionProvider = StateNotifierProvider<ConfiguracionNotifier, Confi
   final tecnicoRepo = ref.watch(tecnicoRepositoryProvider);
   return ConfiguracionNotifier(tecnicoRepo);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  8. THEME MODE NOTIFIER (Modo Claro / Modo Oscuro)
+// ═══════════════════════════════════════════════════════════════════
+
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.dark);
+
+  void toggleTheme() {
+    state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    state = mode;
+  }
+
+  bool get isDark => state == ThemeMode.dark;
+}
+
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+  return ThemeModeNotifier();
+});
+

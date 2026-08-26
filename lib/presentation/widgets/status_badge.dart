@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/utils/status_helper.dart';
 
 class StatusBadge extends StatelessWidget {
@@ -15,8 +16,9 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = StatusHelper.obtenerColorFondo(estado);
-    final textColor = StatusHelper.obtenerColorTexto(estado);
+    final isDark = AppColors.isDark(context);
+    final bgColor = StatusHelper.obtenerColorFondo(estado, isDark: isDark);
+    final textColor = StatusHelper.obtenerColorTexto(estado, isDark: isDark);
     final text = StatusHelper.obtenerTexto(estado);
     final iconData = StatusHelper.obtenerIconoEstado(estado);
 
@@ -25,10 +27,10 @@ class StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: textColor.withValues(alpha: 0.35), width: 1),
+        border: Border.all(color: textColor.withValues(alpha: isDark ? 0.35 : 0.25), width: 1),
         boxShadow: [
           BoxShadow(
-            color: textColor.withValues(alpha: 0.12),
+            color: textColor.withValues(alpha: isDark ? 0.12 : 0.08),
             blurRadius: 6,
             spreadRadius: 0,
             offset: const Offset(0, 1),
@@ -50,7 +52,7 @@ class StatusBadge extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: textColor.withValues(alpha: 0.6),
+                    color: textColor.withValues(alpha: isDark ? 0.6 : 0.3),
                     blurRadius: 4,
                     spreadRadius: 1,
                   ),

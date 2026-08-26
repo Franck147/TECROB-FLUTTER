@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../data/models/servicio_catalogo_model.dart';
 import 'custom_text_field.dart';
 
@@ -74,9 +75,18 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
     final esEdicion = widget.servicioExistente != null;
 
     return AlertDialog(
+      backgroundColor: AppColors.fondoTarjetaOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.fondoBordeOf(context)),
+      ),
       title: Text(
         esEdicion ? 'Editar Servicio' : 'Nuevo Servicio',
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textoPrincipalOf(context),
+        ),
       ),
       content: SingleChildScrollView(
         child: Form(
@@ -104,7 +114,7 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
                 label: 'Precio base (S/) *',
                 hint: '0.00',
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                prefixIcon: Icons.attach_money,
+                prefixIcon: Icons.attach_money_rounded,
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
                     return 'Ingresa el precio';
@@ -119,6 +129,7 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _categoriaSeleccionada,
+                dropdownColor: AppColors.fondoTarjetaOf(context),
                 decoration: const InputDecoration(
                   labelText: 'Categoría *',
                   prefixIcon: Icon(Icons.category_outlined, size: 20),
@@ -126,7 +137,10 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
                 items: _categorias.map((c) {
                   return DropdownMenuItem<String>(
                     value: c['id'],
-                    child: Text(c['label']!),
+                    child: Text(
+                      c['label']!,
+                      style: TextStyle(color: AppColors.textoPrincipalOf(context)),
+                    ),
                   );
                 }).toList(),
                 onChanged: (val) {
@@ -152,10 +166,14 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.textoSecundarioOf(context))),
         ),
         ElevatedButton(
           onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.rojoPrimario,
+            foregroundColor: Colors.white,
+          ),
           child: Text(esEdicion ? 'Guardar Cambios' : 'Agregar'),
         ),
       ],

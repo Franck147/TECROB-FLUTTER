@@ -20,6 +20,7 @@ class OrdenCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
     final cliente = orden.cliente;
     final equipo = orden.equipo;
     final tipoEquipoIcon = StatusHelper.obtenerIconoEquipo(equipo?.tipo);
@@ -35,12 +36,12 @@ class OrdenCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.fondoTarjeta,
+        color: AppColors.fondoTarjetaOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.fondoBorde, width: 1.1),
+        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -65,18 +66,18 @@ class OrdenCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
-                            color: AppColors.rojoContenedor,
+                            color: AppColors.rojoContenedorOf(context),
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
-                              color: AppColors.rojoPrimario.withValues(alpha: 0.3),
+                              color: AppColors.rojoPrimario.withValues(alpha: isDark ? 0.3 : 0.2),
                             ),
                           ),
                           child: Text(
                             orden.numeroOrdenDisplay,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.rojoClaro,
+                              color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -84,9 +85,9 @@ class OrdenCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           DateFormatter.formatearFechaCorta(orden.createdAt),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textoSecundario,
+                            color: AppColors.textoSecundarioOf(context),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -104,15 +105,15 @@ class OrdenCard extends StatelessWidget {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: AppColors.fondoSuperficie,
+                        color: AppColors.fondoSuperficieOf(context),
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.fondoBorde),
+                        border: Border.all(color: AppColors.fondoBordeOf(context)),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Icon(
                           Icons.person_rounded,
                           size: 16,
-                          color: AppColors.textoSecundario,
+                          color: AppColors.textoSecundarioOf(context),
                         ),
                       ),
                     ),
@@ -120,10 +121,10 @@ class OrdenCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         cliente?.nombreCompleto ?? 'Cliente no asignado',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textoPrincipal,
+                          color: AppColors.textoPrincipalOf(context),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -155,9 +156,11 @@ class OrdenCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.fondoSuperficie,
+                    color: AppColors.fondoSuperficieOf(context),
                     borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: AppColors.fondoBorde.withValues(alpha: 0.6)),
+                    border: Border.all(
+                      color: AppColors.fondoBordeOf(context).withValues(alpha: isDark ? 0.6 : 0.8),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -175,10 +178,10 @@ class OrdenCard extends StatelessWidget {
                               equipo != null
                                   ? '${equipo.tipoFormateado}: ${equipo.nombreCompleto}'
                                   : 'Sin equipo asignado',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textoPrincipal,
+                                color: AppColors.textoPrincipalOf(context),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -188,9 +191,9 @@ class OrdenCard extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 2),
                                 child: Text(
                                   equipo.desperfecto!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11.5,
-                                    color: AppColors.textoSecundario,
+                                    color: AppColors.textoSecundarioOf(context),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -213,9 +216,9 @@ class OrdenCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.fondoSuperficie,
+                          color: AppColors.fondoSuperficieOf(context),
                           borderRadius: BorderRadius.circular(5),
-                          border: Border.all(color: AppColors.fondoBorde),
+                          border: Border.all(color: AppColors.fondoBordeOf(context)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -224,10 +227,10 @@ class OrdenCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(
                               '${listaAccesorios.length} ${listaAccesorios.length == 1 ? 'Accesorio' : 'Accesorios'}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textoSecundario,
+                                color: AppColors.textoSecundarioOf(context),
                               ),
                             ),
                           ],
@@ -237,12 +240,15 @@ class OrdenCard extends StatelessWidget {
                             (acc) => Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.fondoPrincipal,
+                                color: AppColors.fondoPrincipalOf(context),
                                 borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(
                                 acc,
-                                style: const TextStyle(fontSize: 10.5, color: AppColors.textoMuted),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: AppColors.textoMutedOf(context),
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -251,14 +257,17 @@ class OrdenCard extends StatelessWidget {
                       if (listaAccesorios.length > 2)
                         Text(
                           '+${listaAccesorios.length - 2} más',
-                          style: const TextStyle(fontSize: 10.5, color: AppColors.textoMuted),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.textoMutedOf(context),
+                          ),
                         ),
                     ],
                   ),
                 ],
 
                 const SizedBox(height: 10),
-                const Divider(height: 1, color: AppColors.fondoBorde),
+                Divider(height: 1, color: AppColors.fondoBordeOf(context)),
                 const SizedBox(height: 10),
 
                 // Fila 4: Totales Financieros & Botón de Stickers Bluetooth
@@ -270,18 +279,18 @@ class OrdenCard extends StatelessWidget {
                       children: [
                         Text(
                           'Total: ${CurrencyFormatter.format(orden.subtotal)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11.5,
-                            color: AppColors.textoSecundario,
+                            color: AppColors.textoSecundarioOf(context),
                           ),
                         ),
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Saldo: ',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textoSecundario,
+                                color: AppColors.textoSecundarioOf(context),
                               ),
                             ),
                             Text(
@@ -300,7 +309,6 @@ class OrdenCard extends StatelessWidget {
                     ),
                     Row(
                       children: [
-                        // Botón de Stickers Térmicos Bluetooth
                         OutlinedButton.icon(
                           onPressed: () {
                             showDialog(
@@ -324,11 +332,11 @@ class OrdenCard extends StatelessWidget {
                             size: 15,
                             color: AppColors.rojoPrimario,
                           ),
-                          label: const Text(
+                          label: Text(
                             'Stickers',
                             style: TextStyle(
                               fontSize: 11.5,
-                              color: AppColors.textoPrincipal,
+                              color: AppColors.textoPrincipalOf(context),
                               fontWeight: FontWeight.w600,
                             ),
                           ),

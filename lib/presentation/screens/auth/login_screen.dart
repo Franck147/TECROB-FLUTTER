@@ -45,6 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final isDark = AppColors.isDark(context);
 
     // Escuchar errores
     ref.listen<AuthState>(authProvider, (previous, next) {
@@ -59,211 +60,212 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppColors.fondoPrincipal,
+      backgroundColor: AppColors.fondoPrincipalOf(context),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo TecrobSys estilizado
-                  Center(
-                    child: Container(
-                      width: 76,
-                      height: 76,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo TecrobSys estilizado
+                    Center(
+                      child: Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(22),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.build_rounded,
+                          color: Colors.white,
+                          size: 38,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Título y Subtítulo
+                    Text(
+                      AppConstants.appName,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        color: AppColors.textoPrincipalOf(context),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Gestión de Taller Técnico Especializado',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textoSecundarioOf(context),
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Tarjeta de Formulario
+                    Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: AppColors.fondoTarjetaOf(context),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.rojoPrimario.withValues(alpha: 0.4),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
+                            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.build_rounded,
-                        color: Colors.white,
-                        size: 38,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Título y Subtítulo
-                  const Text(
-                    AppConstants.appName,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                      color: AppColors.textoPrincipal,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Gestión de Taller Técnico Especializado',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textoSecundario,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-
-                  // Tarjeta de Formulario
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: AppColors.fondoTarjeta,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.fondoBorde, width: 1.1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Iniciar Sesión',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textoPrincipal,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Ingresa con tus credenciales de técnico',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textoSecundario,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Campo Email
-                        CustomTextField(
-                          controller: _emailController,
-                          label: 'Correo Electrónico',
-                          hint: 'tecnico@ejemplo.com',
-                          keyboardType: TextInputType.emailAddress,
-                          prefixIcon: Icons.alternate_email_rounded,
-                          enabled: !authState.isLoading,
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
-                              return 'Ingresa tu correo electrónico';
-                            }
-                            if (!val.contains('@')) {
-                              return 'Correo inválido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Campo Contraseña
-                        CustomTextField(
-                          controller: _passwordController,
-                          label: 'Contraseña',
-                          hint: '••••••••',
-                          obscureText: _obscurePassword,
-                          prefixIcon: Icons.lock_outline_rounded,
-                          enabled: !authState.isLoading,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_rounded
-                                  : Icons.visibility_rounded,
-                              color: AppColors.textoSecundario,
-                              size: 20,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Iniciar Sesión',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textoPrincipalOf(context),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ingresa con tus credenciales de técnico',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textoSecundarioOf(context),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Campo Email
+                          CustomTextField(
+                            controller: _emailController,
+                            label: 'Correo Electrónico',
+                            hint: 'tecnico@ejemplo.com',
+                            keyboardType: TextInputType.emailAddress,
+                            prefixIcon: Icons.alternate_email_rounded,
+                            enabled: !authState.isLoading,
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Ingresa tu correo electrónico';
+                              }
+                              if (!val.contains('@')) {
+                                return 'Correo inválido';
+                              }
+                              return null;
                             },
                           ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
-                              return 'Ingresa tu contraseña';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
+                          const SizedBox(height: 16),
 
-                        // Botón Ingresar
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: authState.isLoading ? null : _intentarLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.rojoPrimario,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          // Campo Contraseña
+                          CustomTextField(
+                            controller: _passwordController,
+                            label: 'Contraseña',
+                            hint: '••••••••',
+                            obscureText: _obscurePassword,
+                            prefixIcon: Icons.lock_outline_rounded,
+                            enabled: !authState.isLoading,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppColors.textoSecundarioOf(context),
+                                size: 20,
                               ),
-                              elevation: 4,
-                              shadowColor: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
                             ),
-                            child: authState.isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.login_rounded, size: 18),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'INGRESAR AL SISTEMA',
-                                        style: TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'Ingresa tu contraseña';
+                              }
+                              if (val.length < 6) {
+                                return 'La contraseña debe tener al menos 6 caracteres';
+                              }
+                              return null;
+                            },
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
-                  // Pie de página
-                  const Text(
-                    AppConstants.empresaRazonSocial,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textoMuted,
+                          // Botón de Inicio de Sesión
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: authState.isLoading ? null : _intentarLogin,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.rojoPrimario,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                                shadowColor: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                              ),
+                              child: authState.isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'INGRESAR AL SISTEMA',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+
+                    // Pie de página
+                    Center(
+                      child: Text(
+                        'TecrobSys Flutter v1.0.0',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textoMutedOf(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -31,15 +31,20 @@ class TecrobSysApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       home: authState.isLoading
-          ? const Scaffold(
-              backgroundColor: AppColors.fondoPrincipal,
-              body: Center(
+          ? Scaffold(
+              backgroundColor: themeMode == ThemeMode.dark
+                  ? AppColors.darkFondoPrincipal
+                  : AppColors.lightFondoPrincipal,
+              body: const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -47,7 +52,7 @@ class TecrobSysApp extends ConsumerWidget {
                     SizedBox(height: 16),
                     Text(
                       'Cargando TecrobSys...',
-                      style: TextStyle(color: AppColors.textoSecundario, fontSize: 13),
+                      style: TextStyle(fontSize: 13),
                     ),
                   ],
                 ),

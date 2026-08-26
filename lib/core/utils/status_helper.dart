@@ -42,45 +42,45 @@ class StatusHelper {
     }
   }
 
-  static Color obtenerColorTexto(String? estado) {
-    if (estado == null) return AppColors.estadoDesconocidoTexto;
+  static Color obtenerColorTexto(String? estado, {bool isDark = true}) {
+    if (estado == null) return isDark ? AppColors.estadoDesconocidoTexto : AppColors.lightTextoMuted;
     switch (estado.toLowerCase()) {
       case 'pendiente':
-        return AppColors.estadoPendienteTexto;
+        return isDark ? AppColors.estadoPendienteTexto : AppColors.estadoPendienteTextoClaro;
       case 'diagnostico':
-        return AppColors.estadoDiagnosticoTexto;
+        return isDark ? AppColors.estadoDiagnosticoTexto : AppColors.estadoDiagnosticoTextoClaro;
       case 'en_progreso':
-        return AppColors.estadoProgresoTexto;
+        return isDark ? AppColors.estadoProgresoTexto : AppColors.estadoProgresoTextoClaro;
       case 'listo':
-        return AppColors.estadoListoTexto;
+        return isDark ? AppColors.estadoListoTexto : AppColors.estadoListoTextoClaro;
       case 'entregado':
-        return AppColors.estadoEntregadoTexto;
+        return isDark ? AppColors.estadoEntregadoTexto : AppColors.estadoEntregadoTextoClaro;
       case 'cancelado':
       case 'sin_reparacion':
-        return AppColors.estadoCanceladoTexto;
+        return isDark ? AppColors.estadoCanceladoTexto : AppColors.estadoCanceladoTextoClaro;
       default:
-        return AppColors.estadoDesconocidoTexto;
+        return isDark ? AppColors.estadoDesconocidoTexto : AppColors.lightTextoMuted;
     }
   }
 
-  static Color obtenerColorFondo(String? estado) {
-    if (estado == null) return AppColors.estadoDesconocidoFondo;
+  static Color obtenerColorFondo(String? estado, {bool isDark = true}) {
+    if (estado == null) return isDark ? AppColors.estadoDesconocidoFondo : AppColors.lightFondoSuperficie;
     switch (estado.toLowerCase()) {
       case 'pendiente':
-        return AppColors.estadoPendienteFondo;
+        return isDark ? AppColors.estadoPendienteFondo : AppColors.estadoPendienteFondoClaro;
       case 'diagnostico':
-        return AppColors.estadoDiagnosticoFondo;
+        return isDark ? AppColors.estadoDiagnosticoFondo : AppColors.estadoDiagnosticoFondoClaro;
       case 'en_progreso':
-        return AppColors.estadoProgresoFondo;
+        return isDark ? AppColors.estadoProgresoFondo : AppColors.estadoProgresoFondoClaro;
       case 'listo':
-        return AppColors.estadoListoFondo;
+        return isDark ? AppColors.estadoListoFondo : AppColors.estadoListoFondoClaro;
       case 'entregado':
-        return AppColors.estadoEntregadoFondo;
+        return isDark ? AppColors.estadoEntregadoFondo : AppColors.estadoEntregadoFondoClaro;
       case 'cancelado':
       case 'sin_reparacion':
-        return AppColors.estadoCanceladoFondo;
+        return isDark ? AppColors.estadoCanceladoFondo : AppColors.estadoCanceladoFondoClaro;
       default:
-        return AppColors.estadoDesconocidoFondo;
+        return isDark ? AppColors.estadoDesconocidoFondo : AppColors.lightFondoSuperficie;
     }
   }
 
