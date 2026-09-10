@@ -4,9 +4,16 @@ class AppConstants {
   static const String supabaseAnonKey =
       'sb_publishable_4prX92nOSSbKaay8HMQuVw_5wynwwa3';
 
-  // API Token de RENIEC / DNI (ApisPeru)
+  /// Token de la consulta de DNI en ApisPeru.
+  ///
+  /// Es una credencial personal, así que no vive en el código: se pasa al
+  /// compilar con --dart-define=DNI_API_TOKEN=... . Si falta, la app funciona
+  /// igual y la búsqueda por DNI queda desactivada.
   static const String dniApiToken =
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFkbGVyY2lzbmVyb3MxNDdAZ21haWwuY29tIn0.oXEO8knJ9JOVp6mhAG_T9DKOSqN78IsbWXLTK13-QRo';
+      String.fromEnvironment('DNI_API_TOKEN', defaultValue: '');
+
+  static bool get consultaDniDisponible => dniApiToken.isNotEmpty;
+
   static const String dniBaseUrl = 'https://dniruc.apisperu.com/api/v1/';
 
   // Empresa Info

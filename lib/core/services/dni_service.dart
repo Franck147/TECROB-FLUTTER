@@ -11,6 +11,11 @@ class DniService {
     if (dniLimpio.length != 8) return null;
 
     const token = AppConstants.dniApiToken;
+    if (token.isEmpty) {
+      debugPrint(
+          'Consulta de DNI desactivada: falta --dart-define=DNI_API_TOKEN');
+      return null;
+    }
 
     // 1. Intentar con HTTP estándar (Evita bloqueos de CORS en Web)
     try {
