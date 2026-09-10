@@ -124,7 +124,7 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.rojoPrimario.withValues(alpha: 0.12)
+              ? AppColors.primarioOf(context).withValues(alpha: 0.12)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -133,14 +133,14 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
           children: [
             Icon(
               isSelected ? activeIcon : icon,
-              color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
+              color: isSelected ? AppColors.primarioOf(context) : AppColors.textoSecundarioOf(context),
               size: 22,
             ),
             const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
+                color: isSelected ? AppColors.primarioOf(context) : AppColors.textoSecundarioOf(context),
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -161,14 +161,14 @@ class _MainLayoutScreenState extends ConsumerState<MainLayoutScreen> {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+            colors: [AppColors.primario, AppColors.primarioOscuro],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.rojoPrimario.withValues(alpha: isSelected ? 0.6 : 0.35),
+              color: AppColors.primario.withValues(alpha: isSelected ? 0.6 : 0.35),
               blurRadius: isSelected ? 12 : 8,
               spreadRadius: isSelected ? 2 : 0,
               offset: const Offset(0, 2),

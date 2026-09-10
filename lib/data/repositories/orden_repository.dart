@@ -14,7 +14,8 @@ class OrdenRepository {
     equipo (*),
     tecnico:tecnico_id (*),
     orden_servicio (*, servicio_catalogo:servicio_id (*)),
-    pago (*)
+    pago (*),
+    historial_estado (*)
   ''';
 
   Future<List<OrdenModel>> listarOrdenes(
@@ -55,74 +56,64 @@ class OrdenRepository {
     return null;
   }
 
+  /// Crea cliente, orden, equipo, servicios y adelanto en una sola transacción.
+  ///
+  /// El cliente entra en la misma llamada a propósito: cuando se guardaba antes
+  /// desde la app, un fallo al crear la orden dejaba el cliente suelto en la
+  /// base.
   Future<OrdenModel> crearOrdenCompleta({
-    required int empresaId,
-    required int tecnicoId,
+    required Map<String, dynamic> datosCliente,
     required Map<String, dynamic> datosOrden,
     required Map<String, dynamic> datosEquipo,
     required List<ServicioCatalogoModel> servicios,
   }) async {
-    // 1. Calcular subtotal de servicios
-    double subtotalServicios = 0.0;
-    for (var s in servicios) {
-      subtotalServicios += s.precioBase;
-    }
+    // Las líneas de servicio viajan como lista; la función calcula el subtotal
+    // a partir de ellas. 'subtotal' no se manda: en orden_servicio la genera la
+    // propia base a partir de cantidad y precio_unitario.
+    final serviciosPayload = servicios
+        .map((s) => {
+              'servicio_id': s.id,
+              'cantidad': 1,
+              'precio_unitario': s.precioBase,
+            })
+        .toList();
 
-    double adelanto = (datosOrden['adelanto'] as num?)?.toDouble() ?? 0.0;
-    double descuento = (datosOrden['descuento'] as num?)?.toDouble() ?? 0.0;
-    double saldoPendiente = subtotalServicios - descuento - adelanto;
+    final resultado = await _supabase.rpc(
+      'crear_orden_completa',
+      params: {
+        'p_cliente': datosCliente,
+        'p_orden': datosOrden,
+        'p_equipo': datosEquipo,
+        'p_servicios': serviciosPayload,
+      },
+    );
 
-    datosOrden['subtotal'] = subtotalServicios;
-    datosOrden['saldo_pendiente'] = saldoPendiente > 0 ? saldoPendiente : 0.0;
+    final int ordenId = resultado is int
+        ? resultado
+        : int.parse(resultado.toString());
 
-    // 2. Insertar orden
-    final ordenJson = await _supabase
-        .from('orden')
-        .insert(datosOrden)
-        .select()
-        .single();
-
-    final int ordenId = ordenJson['id'] as int;
-
-    // 3. Insertar equipo
-    datosEquipo['orden_id'] = ordenId;
-    await _supabase.from('equipo').insert(datosEquipo);
-
-    // 4. Insertar servicios asociados
-    if (servicios.isNotEmpty) {
-      final List<Map<String, dynamic>> itemsInsert = servicios.map((s) {
-        return {
-          'orden_id': ordenId,
-          'servicio_id': s.id,
-          'cantidad': 1,
-          'precio_unitario': s.precioBase,
-          'subtotal': s.precioBase,
-        };
-      }).toList();
-
-      await _supabase.from('orden_servicio').insert(itemsInsert);
-    }
-
-    // 5. Si hubo adelanto inicial > 0, registrar pago inicial
-    if (adelanto > 0) {
-      await _supabase.from('pago').insert({
-        'orden_id': ordenId,
-        'monto': adelanto,
-        'metodo': 'efectivo',
-        'nota': 'Adelanto inicial al crear la orden',
-      });
-    }
-
-    // 6. Retornar la orden completa cargada con sus relaciones
+    // Retornar la orden completa cargada con sus relaciones
     final ordenCompleta = await obtenerOrdenPorId(ordenId);
     return ordenCompleta!;
   }
 
+  /// Cambia el estado de la orden.
+  ///
+  /// El historial y la fecha de actualización los escribe la base con sus
+  /// propios disparadores, para que ninguna ruta de escritura pueda saltárselos.
   Future<void> actualizarEstado(int ordenId, String nuevoEstado) async {
     await _supabase
         .from('orden')
         .update({'estado': nuevoEstado})
         .eq('id', ordenId);
+  }
+
+  /// Corrige los datos comerciales de una orden ya creada: prioridad, plazo,
+  /// descuento y observaciones. Los importes los recalcula la base.
+  Future<void> actualizarOrden(int ordenId, Map<String, dynamic> cambios) async {
+    if (cambios.isEmpty) return;
+
+    await _supabase.from('orden').update(cambios).eq('id', ordenId);
   }
 
   Future<PagoModel> registrarPago({
@@ -143,25 +134,5 @@ class OrdenRepository {
         .single();
 
     return PagoModel.fromJson(response);
-  }
-
-  Future<int> contarOrdenesActivas(int empresaId) async {
-    final response = await _supabase
-        .from('orden')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .not('estado', 'in', '("entregado","cancelado","sin_reparacion")');
-
-    return (response as List).length;
-  }
-
-  Future<int> contarOrdenesPendientes(int empresaId) async {
-    final response = await _supabase
-        .from('orden')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .eq('estado', 'pendiente');
-
-    return (response as List).length;
   }
 }

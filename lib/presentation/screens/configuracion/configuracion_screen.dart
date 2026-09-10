@@ -214,14 +214,14 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     height: 72,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [AppColors.rojoPrimario, AppColors.rojoOscuro],
+                        colors: [AppColors.primario, AppColors.primarioOscuro],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.rojoPrimario.withValues(alpha: 0.35),
+                          color: AppColors.primario.withValues(alpha: 0.35),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
@@ -257,11 +257,11 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: esAdmin
-                          ? AppColors.rojoContenedorOf(context)
+                          ? AppColors.primarioContenedorOf(context)
                           : AppColors.fondoSuperficieOf(context),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: esAdmin ? AppColors.rojoClaro : AppColors.fondoBordeOf(context),
+                        color: esAdmin ? AppColors.primarioClaro : AppColors.fondoBordeOf(context),
                       ),
                     ),
                     child: Text(
@@ -269,7 +269,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: esAdmin ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
+                        color: esAdmin ? AppColors.primario : AppColors.textoSecundarioOf(context),
                       ),
                     ),
                   ),
@@ -311,7 +311,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     children: [
                       Icon(
                         themeMode == ThemeMode.dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                        color: AppColors.rojoPrimario,
+                        color: AppColors.primario,
                         size: 18,
                       ),
                       const SizedBox(width: 8),
@@ -390,7 +390,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoPrimario, size: 18),
+                      const Icon(Icons.bluetooth_audio_rounded, color: AppColors.primario, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         'IMPRESORA TÉRMICA & BLUETOOTH',
@@ -414,10 +414,10 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _probarImpresionStickerPrueba,
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppColors.rojoPrimario.withValues(alpha: 0.4)),
+                        side: BorderSide(color: AppColors.primario.withValues(alpha: 0.4)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      icon: const Icon(Icons.print_rounded, size: 18, color: AppColors.rojoPrimario),
+                      icon: const Icon(Icons.print_rounded, size: 18, color: AppColors.primario),
                       label: const Text(
                         'Imprimir Etiqueta / Sticker de Prueba',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
@@ -455,7 +455,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(color: AppColors.rojoPrimario),
+                    child: CircularProgressIndicator(color: AppColors.primario),
                   ),
                 )
               else if (configState.tecnicos.isEmpty)
@@ -477,12 +477,12 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: tec.esAdmin
-                            ? AppColors.rojoContenedorOf(context)
+                            ? AppColors.primarioContenedorOf(context)
                             : AppColors.fondoSuperficieOf(context),
                         child: Text(
                           tec.inicial,
                           style: TextStyle(
-                            color: tec.esAdmin ? AppColors.rojoPrimario : AppColors.textoPrincipalOf(context),
+                            color: tec.esAdmin ? AppColors.primario : AppColors.textoPrincipalOf(context),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -545,11 +545,11 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.rojoPrimario.withValues(alpha: isDark ? 0.15 : 0.1)
+              ? AppColors.primario.withValues(alpha: isDark ? 0.15 : 0.1)
               : AppColors.fondoSuperficieOf(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.rojoPrimario : AppColors.fondoBordeOf(context),
+            color: isSelected ? AppColors.primario : AppColors.fondoBordeOf(context),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -558,7 +558,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
             Icon(
               icon,
               size: 20,
-              color: isSelected ? AppColors.rojoPrimario : AppColors.textoSecundarioOf(context),
+              color: isSelected ? AppColors.primario : AppColors.textoSecundarioOf(context),
             ),
             const SizedBox(height: 6),
             Text(
@@ -566,7 +566,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? AppColors.rojoPrimario : AppColors.textoPrincipalOf(context),
+                color: isSelected ? AppColors.primario : AppColors.textoPrincipalOf(context),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

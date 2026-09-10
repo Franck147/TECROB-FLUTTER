@@ -171,7 +171,7 @@ class _CreateServiceDialogState extends State<CreateServiceDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.rojoPrimario,
+            backgroundColor: AppColors.primario,
             foregroundColor: Colors.white,
           ),
           child: Text(esEdicion ? 'Guardar Cambios' : 'Agregar'),

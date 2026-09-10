@@ -67,7 +67,7 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
                     titulo: 'Todas',
                     valor: '${ordenesState.todasLasOrdenes.length}',
                     color: AppColors.textoPrincipalOf(context),
-                    isSelected: ordenesState.filtroEstado == null,
+                    isSelected: ordenesState.filtroEstado == null && !ordenesState.soloVencidas,
                     onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado(null),
                   ),
                 ),
@@ -77,7 +77,7 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
                     context: context,
                     titulo: 'Pendientes',
                     valor: '${ordenesState.pendientesCount}',
-                    color: AppColors.rojoPrimario,
+                    color: AppColors.primario,
                     isSelected: ordenesState.filtroEstado == 'pendiente',
                     onTap: () => ref.read(ordenesProvider.notifier).setFiltroEstado('pendiente'),
                   ),
@@ -110,6 +110,45 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
             ),
           ),
 
+          // ── Aviso de filtro de atrasadas (llega desde el panel) ──
+          if (ordenesState.soloVencidas)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+                decoration: BoxDecoration(
+                  color: AppColors.errorOf(context).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.errorOf(context).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 17, color: AppColors.errorOf(context)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mostrando sólo órdenes pasadas de fecha',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.errorOf(context),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => ref.read(ordenesProvider.notifier).setFiltroEstado(null),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      child: const Text('Quitar filtro', style: TextStyle(fontSize: 12.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // ── Barra de Búsqueda ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -139,11 +178,11 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _cargarOrdenes(),
-              color: AppColors.rojoPrimario,
+              color: AppColors.primario,
               backgroundColor: AppColors.fondoTarjetaOf(context),
               child: ordenesState.isLoading && ordenesState.todasLasOrdenes.isEmpty
                   ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.rojoPrimario),
+                      child: CircularProgressIndicator(color: AppColors.primario),
                     )
                   : ordenesState.ordenesFiltradas.isEmpty
                       ? Center(

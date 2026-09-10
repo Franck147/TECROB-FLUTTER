@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants/app_colors.dart';
@@ -12,10 +14,15 @@ import 'presentation/screens/main/main_layout_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicialización de Supabase con URL y Anon Key
+  // Datos de idioma para intl: sin esto, todo DateFormat con locale 'es_PE'
+  // lanza excepción y las fechas caen al formato de respaldo.
+  await initializeDateFormatting('es_PE', null);
+
+  // Inicialización de Supabase. La clave publicable puede viajar en la app:
+  // lo que protege los datos son las políticas de seguridad por fila.
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
+    publishableKey: AppConstants.supabaseAnonKey,
   );
 
   runApp(
@@ -36,6 +43,19 @@ class TecrobSysApp extends ConsumerWidget {
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
+      // Sin estos delegados, el calendario y los diálogos de Material caen al
+      // inglés por defecto: los meses y los días de la semana salen en inglés
+      // aunque los botones lleven texto propio en español.
+      locale: const Locale('es', 'PE'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'PE'),
+        Locale('es'),
+      ],
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
@@ -48,7 +68,7 @@ class TecrobSysApp extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(color: AppColors.rojoPrimario),
+                    CircularProgressIndicator(color: AppColors.primario),
                     SizedBox(height: 16),
                     Text(
                       'Cargando TecrobSys...',

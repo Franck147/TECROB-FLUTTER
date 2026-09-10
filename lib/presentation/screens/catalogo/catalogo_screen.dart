@@ -118,7 +118,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _abrirDialogoServicio(),
-        backgroundColor: AppColors.rojoPrimario,
+        backgroundColor: AppColors.primario,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Nuevo Servicio', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -178,10 +178,10 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _cargarServicios(),
-              color: AppColors.rojoPrimario,
+              color: AppColors.primario,
               backgroundColor: AppColors.fondoTarjetaOf(context),
               child: catalogoState.isLoading && catalogoState.todosLosServicios.isEmpty
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.rojoPrimario))
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primario))
                   : catalogoState.serviciosFiltrados.isEmpty
                       ? Center(
                           child: Text(
@@ -212,12 +212,12 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.rojoContenedorOf(context),
+                                    color: AppColors.primarioContenedorOf(context),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
                                     Icons.handyman_rounded,
-                                    color: isDark ? AppColors.rojoClaro : AppColors.rojoPrimario,
+                                    color: isDark ? AppColors.primarioClaro : AppColors.primario,
                                     size: 18,
                                   ),
                                 ),
@@ -256,7 +256,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
                                       style: TextStyle(
                                         fontSize: 14.5,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
+                                        color: isDark ? AppColors.primarioClaro : AppColors.primarioOscuro,
                                       ),
                                     ),
                                     PopupMenuButton<String>(

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
 import 'custom_text_field.dart';
+
+/// Margen para que los céntimos de redondeo no bloqueen un cobro que en la
+/// práctica cancela la deuda.
+const double _tolerancia = 0.01;
 
 class RegisterPaymentDialog extends StatefulWidget {
   final double saldoPendiente;
@@ -48,8 +53,10 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    final monto = double.tryParse(_montoController.text.trim()) ?? 0.0;
+    final monto =
+        double.tryParse(_montoController.text.trim().replaceAll(',', '.')) ?? 0.0;
     if (monto <= 0) return;
+    if (monto > widget.saldoPendiente + _tolerancia) return;
 
     final nota = _notaController.text.trim().isNotEmpty
         ? _notaController.text.trim()
@@ -69,7 +76,7 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
       ),
       title: Row(
         children: [
-          const Icon(Icons.payment_rounded, color: AppColors.rojoPrimario, size: 22),
+          const Icon(Icons.payment_rounded, color: AppColors.primario, size: 22),
           const SizedBox(width: 8),
           Text(
             'Registrar Pago',
@@ -98,9 +105,16 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
                   if (val == null || val.trim().isEmpty) {
                     return 'Ingresa un monto';
                   }
-                  final n = double.tryParse(val.trim());
+                  final n = double.tryParse(val.trim().replaceAll(',', '.'));
                   if (n == null || n <= 0) {
                     return 'Monto inválido';
+                  }
+                  // Cobrar por encima del saldo deja la orden con saldo
+                  // negativo, que es lo que aparecía en el panel como un
+                  // importe en rojo sin explicación.
+                  if (n > widget.saldoPendiente + _tolerancia) {
+                    return 'No puedes cobrar más de '
+                        '${CurrencyFormatter.format(widget.saldoPendiente)}';
                   }
                   return null;
                 },
@@ -149,7 +163,7 @@ class _RegisterPaymentDialogState extends State<RegisterPaymentDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.rojoPrimario,
+            backgroundColor: AppColors.primario,
             foregroundColor: Colors.white,
           ),
           child: const Text('Registrar'),

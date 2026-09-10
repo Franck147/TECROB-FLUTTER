@@ -17,11 +17,16 @@ class AuthRepository {
     );
   }
 
+  /// El perfil del técnico que hay detrás del usuario autenticado.
+  ///
+  /// Sólo devuelve técnicos activos: dar de baja a alguien tiene que cerrarle
+  /// la puerta, no sólo sacarlo del listado de la pantalla de configuración.
   Future<TecnicoModel?> obtenerPerfilTecnico(String authUserId) async {
     final response = await _supabase
         .from('tecnico')
         .select()
         .eq('auth_user_id', authUserId)
+        .eq('activo', true)
         .maybeSingle();
 
     if (response != null) {

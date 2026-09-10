@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/dni_service.dart';
+import '../../core/utils/status_helper.dart';
 import '../../data/models/orden_model.dart';
 import '../../data/models/servicio_catalogo_model.dart';
 import '../../data/models/tecnico_model.dart';
@@ -169,6 +170,11 @@ class DashboardState {
   final int pendientesCount;
   final int listasCount;
   final List<OrdenModel> ordenesListasParaEntrega;
+
+  /// Órdenes que siguen en el taller con la fecha prometida ya pasada,
+  /// ordenadas de la más atrasada a la menos.
+  final List<OrdenModel> ordenesVencidas;
+
   final Map<String, int> distribucionEstados;
   final Map<String, int> distribucionTiposEquipo;
   final String? errorMessage;
@@ -184,10 +190,17 @@ class DashboardState {
     this.pendientesCount = 0,
     this.listasCount = 0,
     this.ordenesListasParaEntrega = const [],
+    this.ordenesVencidas = const [],
     this.distribucionEstados = const {},
     this.distribucionTiposEquipo = const {},
     this.errorMessage,
   });
+
+  int get vencidasCount => ordenesVencidas.length;
+
+  /// Retraso de la orden más atrasada, para el subtítulo de la tarjeta.
+  int get diasMaximoRetraso =>
+      ordenesVencidas.isEmpty ? 0 : ordenesVencidas.first.diasDeRetraso;
 
   DashboardState copyWith({
     bool? isLoading,
@@ -200,6 +213,7 @@ class DashboardState {
     int? pendientesCount,
     int? listasCount,
     List<OrdenModel>? ordenesListasParaEntrega,
+    List<OrdenModel>? ordenesVencidas,
     Map<String, int>? distribucionEstados,
     Map<String, int>? distribucionTiposEquipo,
     String? errorMessage,
@@ -215,6 +229,7 @@ class DashboardState {
       pendientesCount: pendientesCount ?? this.pendientesCount,
       listasCount: listasCount ?? this.listasCount,
       ordenesListasParaEntrega: ordenesListasParaEntrega ?? this.ordenesListasParaEntrega,
+      ordenesVencidas: ordenesVencidas ?? this.ordenesVencidas,
       distribucionEstados: distribucionEstados ?? this.distribucionEstados,
       distribucionTiposEquipo: distribucionTiposEquipo ?? this.distribucionTiposEquipo,
       errorMessage: errorMessage,
@@ -232,21 +247,22 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     try {
       final todas = await _ordenRepo.listarOrdenes(empresaId);
 
-      double ingresos = 0.0;
+      // Cobrado es dinero que ya entró, es decir la suma de los pagos. Antes
+      // esto sumaba lo facturado, que cuenta como ingreso una orden que el
+      // cliente todavía no ha pagado.
+      double cobrado = 0.0;
       double porCobrar = 0.0;
+      double facturado = 0.0;
+      int facturadas = 0;
       int reparados = 0;
       int pendientes = 0;
       int activas = 0;
       int listas = 0;
 
       final List<OrdenModel> listasEntrega = [];
+      final List<OrdenModel> vencidas = [];
       final Map<String, int> estadosMap = {
-        'pendiente': 0,
-        'diagnostico': 0,
-        'en_progreso': 0,
-        'listo': 0,
-        'entregado': 0,
-        'cancelado': 0,
+        for (final estado in StatusHelper.todosLosEstados) estado: 0,
       };
 
       final Map<String, int> tiposMap = {};
@@ -255,9 +271,12 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         final est = o.estado.toLowerCase();
         estadosMap[est] = (estadosMap[est] ?? 0) + 1;
 
+        // Una orden cancelada no factura, no cobra y no se persigue.
         if (est != 'cancelado') {
-          ingresos += (o.subtotal - o.descuento);
+          cobrado += o.totalPagado;
           porCobrar += o.saldoPendiente;
+          facturado += o.total;
+          facturadas++;
         }
 
         if (est == 'entregado' || est == 'listo') {
@@ -269,20 +288,27 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
           listas++;
           listasEntrega.add(o);
         }
-        if (est == 'pendiente' || est == 'diagnostico' || est == 'en_progreso' || est == 'listo') {
-          activas++;
-        }
+        if (!o.estaCerrada) activas++;
+
+        if (o.estaVencida) vencidas.add(o);
 
         // Tipo equipo
         final tipo = o.equipo?.tipo.toLowerCase() ?? 'otro';
         tiposMap[tipo] = (tiposMap[tipo] ?? 0) + 1;
       }
 
-      final ticketProm = todas.isNotEmpty && ingresos > 0 ? (ingresos / todas.length) : 0.0;
+      // La más atrasada primero, que es la que urge.
+      vencidas.sort((a, b) => b.diasDeRetraso.compareTo(a.diasDeRetraso));
+
+      // Las que esperan al cliente, la que más lleva esperando primero.
+      listasEntrega.sort(
+          (a, b) => b.diasEsperandoRecojo.compareTo(a.diasEsperandoRecojo));
+
+      final ticketProm = facturadas > 0 ? (facturado / facturadas) : 0.0;
 
       state = state.copyWith(
         isLoading: false,
-        totalIngresos: ingresos,
+        totalIngresos: cobrado,
         cuentasPorCobrar: porCobrar,
         totalOrdenes: todas.length,
         equiposReparados: reparados,
@@ -291,6 +317,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         pendientesCount: pendientes,
         listasCount: listas,
         ordenesListasParaEntrega: listasEntrega,
+        ordenesVencidas: vencidas,
         distribucionEstados: estadosMap,
         distribucionTiposEquipo: tiposMap,
       );
@@ -318,6 +345,11 @@ class OrdenesState {
   final List<OrdenModel> ordenesFiltradas;
   final String? filtroEstado; // null = Todas, 'pendiente', 'en_progreso', 'listo'
   final String busqueda;
+
+  /// Deja sólo las órdenes con la fecha prometida pasada. Lo activa el panel
+  /// al tocar la tarjeta de atrasadas; los chips de estado lo apagan.
+  final bool soloVencidas;
+
   final String? errorMessage;
 
   OrdenesState({
@@ -326,6 +358,7 @@ class OrdenesState {
     this.ordenesFiltradas = const [],
     this.filtroEstado,
     this.busqueda = '',
+    this.soloVencidas = false,
     this.errorMessage,
   });
 
@@ -343,6 +376,7 @@ class OrdenesState {
     String? filtroEstado,
     bool clearFiltroEstado = false,
     String? busqueda,
+    bool? soloVencidas,
     String? errorMessage,
   }) {
     return OrdenesState(
@@ -351,6 +385,7 @@ class OrdenesState {
       ordenesFiltradas: ordenesFiltradas ?? this.ordenesFiltradas,
       filtroEstado: clearFiltroEstado ? null : (filtroEstado ?? this.filtroEstado),
       busqueda: busqueda ?? this.busqueda,
+      soloVencidas: soloVencidas ?? this.soloVencidas,
       errorMessage: errorMessage,
     );
   }
@@ -379,11 +414,21 @@ class OrdenesNotifier extends StateNotifier<OrdenesState> {
   }
 
   void setFiltroEstado(String? estado) {
+    // Elegir un estado a mano descarta el filtro de atrasadas, para que los
+    // chips de la pantalla siempre digan la verdad sobre lo que se ve.
     if (estado == null) {
-      state = state.copyWith(clearFiltroEstado: true);
+      state = state.copyWith(clearFiltroEstado: true, soloVencidas: false);
     } else {
-      state = state.copyWith(filtroEstado: estado);
+      state = state.copyWith(filtroEstado: estado, soloVencidas: false);
     }
+    _aplicarFiltros();
+  }
+
+  /// Muestra únicamente las órdenes atrasadas, sin filtro de estado.
+  void setSoloVencidas() {
+    // No se toca la búsqueda: el campo de texto de la pantalla seguiría
+    // mostrando lo escrito y el filtro dejaría de coincidir con lo que se ve.
+    state = state.copyWith(clearFiltroEstado: true, soloVencidas: true);
     _aplicarFiltros();
   }
 
@@ -400,18 +445,29 @@ class OrdenesNotifier extends StateNotifier<OrdenesState> {
       lista = lista.where((o) => o.estado == state.filtroEstado).toList();
     }
 
+    // Filtro de atrasadas, la más vencida primero
+    if (state.soloVencidas) {
+      lista = lista.where((o) => o.estaVencida).toList()
+        ..sort((a, b) => b.diasDeRetraso.compareTo(a.diasDeRetraso));
+    }
+
     // Filtro por texto
     if (state.busqueda.isNotEmpty) {
       final query = state.busqueda;
       lista = lista.where((o) {
-        final numOrd = o.numeroOrden?.toLowerCase() ?? '';
-        final clienteNom = o.cliente?.nombreCompleto.toLowerCase() ?? '';
-        final marca = o.equipo?.marca.toLowerCase() ?? '';
-        final modelo = o.equipo?.modelo?.toLowerCase() ?? '';
-        return numOrd.contains(query) ||
-            clienteNom.contains(query) ||
-            marca.contains(query) ||
-            modelo.contains(query);
+        // El teléfono y el documento van incluidos porque en mostrador el
+        // cliente los da antes que el número de orden.
+        final campos = [
+          o.numeroOrden ?? '',
+          '${o.id}',
+          o.cliente?.nombreCompleto ?? '',
+          o.cliente?.telefono ?? '',
+          o.cliente?.dni ?? '',
+          o.equipo?.marca ?? '',
+          o.equipo?.modelo ?? '',
+          o.equipo?.numeroSerie ?? '',
+        ];
+        return campos.any((campo) => campo.toLowerCase().contains(query));
       }).toList();
     }
 
@@ -496,6 +552,24 @@ class DetalleOrdenNotifier extends StateNotifier<DetalleOrdenState> {
     }
   }
 
+  /// Corrige datos comerciales de la orden: prioridad, plazo, descuento y
+  /// observaciones. Los importes los recalcula la base al guardar.
+  Future<bool> actualizarOrden(Map<String, dynamic> cambios) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      await _ordenRepo.actualizarOrden(ordenId, cambios);
+      await cargarOrden();
+      state = state.copyWith(successMessage: 'Orden actualizada');
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Error al actualizar la orden: $e',
+      );
+      return false;
+    }
+  }
+
   Future<bool> registrarPago({
     required double monto,
     required String metodo,
@@ -503,6 +577,16 @@ class DetalleOrdenNotifier extends StateNotifier<DetalleOrdenState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
+      // El tope lo pone también la base, pero avisar aquí evita el viaje.
+      final saldo = state.orden?.saldoPendiente ?? 0;
+      if (monto > saldo + 0.01) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'El cobro supera el saldo pendiente de la orden',
+        );
+        return false;
+      }
+
       await _ordenRepo.registrarPago(
         ordenId: ordenId,
         monto: monto,

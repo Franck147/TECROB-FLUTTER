@@ -6,8 +6,10 @@ import '../../../core/services/whatsapp_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/status_helper.dart';
+import '../../../data/models/orden_model.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/change_status_dialog.dart';
+import '../../widgets/edit_orden_dialog.dart';
 import '../../widgets/imprimir_stickers_dialog.dart';
 import '../../widgets/register_payment_dialog.dart';
 import '../../widgets/status_badge.dart';
@@ -54,30 +56,93 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
       builder: (ctx) => RegisterPaymentDialog(
         saldoPendiente: saldoPendiente,
         onSave: (monto, metodo, nota) async {
-          final ok = await ref
-              .read(detalleOrdenProvider(widget.ordenId).notifier)
-              .registrarPago(monto: monto, metodo: metodo, nota: nota);
-          if (ok) _mostrarMensaje('Pago de S/ $monto registrado correctamente');
+          final notifier = ref.read(detalleOrdenProvider(widget.ordenId).notifier);
+          final ok = await notifier.registrarPago(
+            monto: monto,
+            metodo: metodo,
+            nota: nota,
+          );
+          if (!mounted) return;
+          if (ok) {
+            _mostrarMensaje(
+                'Pago de ${CurrencyFormatter.format(monto)} registrado');
+          } else {
+            final error = ref.read(detalleOrdenProvider(widget.ordenId)).errorMessage;
+            _mostrarMensaje(error ?? 'No se pudo registrar el pago', esError: true);
+          }
         },
       ),
     );
   }
 
-  void _abrirDialogoStickers(dynamic orden) {
+  /// Abre la corrección de los datos comerciales de la orden.
+  void _abrirDialogoEdicion(OrdenModel orden) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => EditOrdenDialog(
+        orden: orden,
+        onGuardar: (cambios) async {
+          final ok = await ref
+              .read(detalleOrdenProvider(widget.ordenId).notifier)
+              .actualizarOrden(cambios);
+          if (mounted && ok) _mostrarMensaje('Orden actualizada');
+          return ok;
+        },
+      ),
+    );
+  }
+
+  void _abrirDialogoStickers(OrdenModel orden) {
     showDialog(
       context: context,
       builder: (ctx) => ImprimirStickersDialog(orden: orden),
     );
   }
 
-  Future<void> _compartirPdf() async {
+  /// Pregunta qué comprobante se quiere antes de generarlo: la hoja A4 con las
+  /// dos copias para firmar, o sólo la mitad del cliente para enviársela.
+  Future<void> _elegirComprobante() async {
+    final soloCliente = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            ListTile(
+              leading: Icon(Icons.print_outlined, color: AppColors.primarioOf(ctx)),
+              title: const Text('Imprimir hoja A4'),
+              subtitle: const Text('Copia del cliente y cargo del taller para firmar'),
+              onTap: () => Navigator.of(ctx).pop(false),
+            ),
+            ListTile(
+              leading: Icon(Icons.send_outlined, color: AppColors.primarioOf(ctx)),
+              title: const Text('Enviar copia al cliente'),
+              subtitle: const Text('Media hoja A5, para mandar por WhatsApp'),
+              onTap: () => Navigator.of(ctx).pop(true),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (soloCliente == null || !mounted) return;
+    await _compartirPdf(soloCliente: soloCliente);
+  }
+
+  Future<void> _compartirPdf({required bool soloCliente}) async {
     final state = ref.read(detalleOrdenProvider(widget.ordenId));
     final orden = state.orden;
     if (orden == null) return;
 
     setState(() => _isGeneratingPdf = true);
     try {
-      await PdfInvoiceService.imprimirOCompartir(orden);
+      if (soloCliente) {
+        await PdfInvoiceService.compartirCopiaCliente(orden);
+      } else {
+        await PdfInvoiceService.imprimirOCompartir(orden);
+      }
     } catch (e) {
       _mostrarMensaje('Error al generar PDF: $e', esError: true);
     } finally {
@@ -168,7 +233,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
         actions: [
           if (orden != null) ...[
             IconButton(
-              icon: const Icon(Icons.bluetooth_audio_rounded, color: AppColors.rojoPrimario),
+              icon: const Icon(Icons.bluetooth_audio_rounded, color: AppColors.primario),
               tooltip: 'Imprimir Stickers Térmicos',
               onPressed: () => _abrirDialogoStickers(orden),
             ),
@@ -181,13 +246,13 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                     )
                   : const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'Exportar Comprobante PDF',
-              onPressed: _isGeneratingPdf ? null : _compartirPdf,
+              onPressed: _isGeneratingPdf ? null : _elegirComprobante,
             ),
           ],
         ],
       ),
       body: state.isLoading && orden == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.rojoPrimario))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primario))
           : orden == null
               ? Center(
                   child: Text(
@@ -238,7 +303,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildQuickActionsRow(dynamic orden) {
+  Widget _buildQuickActionsRow(OrdenModel orden) {
     return Row(
       children: [
         Expanded(
@@ -246,10 +311,10 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             onPressed: () => _abrirDialogoStickers(orden),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              side: BorderSide(color: AppColors.rojoPrimario.withValues(alpha: 0.4)),
+              side: BorderSide(color: AppColors.primario.withValues(alpha: 0.4)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            icon: const Icon(Icons.bluetooth_audio_rounded, size: 18, color: AppColors.rojoPrimario),
+            icon: const Icon(Icons.bluetooth_audio_rounded, size: 18, color: AppColors.primario),
             label: const Text(
               'Stickers Térmicos',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -259,13 +324,13 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
         const SizedBox(width: 8),
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _isGeneratingPdf ? null : _compartirPdf,
+            onPressed: _isGeneratingPdf ? null : _elegirComprobante,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
               side: BorderSide(color: AppColors.fondoBordeOf(context)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoPrimario),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.primario),
             label: const Text(
               'Comprobante PDF',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -276,7 +341,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildHeaderCard(dynamic orden) {
+  Widget _buildHeaderCard(OrdenModel orden) {
     final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(16),
@@ -303,7 +368,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
+                  color: isDark ? AppColors.primarioClaro : AppColors.primarioOscuro,
                 ),
               ),
               const SizedBox(height: 2),
@@ -330,7 +395,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildClienteCard(dynamic orden) {
+  Widget _buildClienteCard(OrdenModel orden) {
     final isDark = AppColors.isDark(context);
     final cliente = orden.cliente;
     final tel = cliente?.telefono ?? '';
@@ -366,11 +431,11 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.rojoContenedorOf(context),
+                backgroundColor: AppColors.primarioContenedorOf(context),
                 child: Text(
                   cliente?.iniciales ?? '?',
                   style: TextStyle(
-                    color: isDark ? AppColors.rojoClaro : AppColors.rojoPrimario,
+                    color: isDark ? AppColors.primarioClaro : AppColors.primario,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -404,7 +469,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               ),
               if (tel.isNotEmpty) ...[
                 IconButton(
-                  icon: const Icon(Icons.phone_rounded, color: AppColors.rojoPrimario, size: 20),
+                  icon: const Icon(Icons.phone_rounded, color: AppColors.primario, size: 20),
                   onPressed: () => WhatsappService.realizarLlamada(tel),
                   tooltip: 'Llamar',
                 ),
@@ -421,7 +486,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildEquipoCard(dynamic orden) {
+  Widget _buildEquipoCard(OrdenModel orden) {
     final isDark = AppColors.isDark(context);
     final equipo = orden.equipo;
 
@@ -462,7 +527,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               children: [
                 Icon(
                   StatusHelper.obtenerIconoEquipo(equipo.tipo),
-                  color: AppColors.rojoPrimario,
+                  color: AppColors.primario,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -503,7 +568,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildServiciosCard(dynamic orden) {
+  Widget _buildServiciosCard(OrdenModel orden) {
     final isDark = AppColors.isDark(context);
     final items = orden.itemsServicio;
 
@@ -565,7 +630,7 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildTotalesCard(dynamic orden) {
+  Widget _buildTotalesCard(OrdenModel orden) {
     final isDark = AppColors.isDark(context);
     return Container(
       padding: const EdgeInsets.all(16),
@@ -585,7 +650,11 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
         children: [
           _buildFinancialRow('Subtotal', CurrencyFormatter.format(orden.subtotal)),
           _buildFinancialRow('Descuento', '- ${CurrencyFormatter.format(orden.descuento)}'),
-          _buildFinancialRow('Adelantos', '- ${CurrencyFormatter.format(orden.adelanto)}'),
+          _buildFinancialRow('Total del trabajo', CurrencyFormatter.format(orden.total)),
+          // Suma de todos los pagos, no sólo del adelanto inicial: si no, el
+          // desglose deja de cuadrar con el saldo en cuanto se cobra una vez.
+          _buildFinancialRow(
+              'Pagado', '- ${CurrencyFormatter.format(orden.totalPagado)}'),
           Divider(height: 16, color: AppColors.fondoBordeOf(context)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -613,25 +682,28 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
     );
   }
 
-  Widget _buildActionButtons(dynamic orden) {
+  Widget _buildActionButtons(OrdenModel orden) {
     return Column(
       children: [
-        // Botón principal: Avisar Listo
-        ElevatedButton.icon(
-          icon: const Icon(Icons.check_circle_outline_rounded),
-          label: const Text('MARCAR LISTA Y AVISAR POR WHATSAPP'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.verdeWhatsappFondoOf(context),
-            foregroundColor: AppColors.verdeWhatsapp,
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.verdeWhatsapp.withValues(alpha: 0.4)),
+        // Botón principal: Avisar Listo. No tiene sentido en una orden ya
+        // cerrada, ni en una que ya está lista y avisada.
+        if (!orden.estaCerrada && orden.estado.toLowerCase() != 'listo') ...[
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check_circle_outline_rounded),
+            label: const Text('MARCAR LISTA Y AVISAR POR WHATSAPP'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.verdeWhatsappFondoOf(context),
+              foregroundColor: AppColors.verdeWhatsapp,
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.verdeWhatsapp.withValues(alpha: 0.4)),
+              ),
             ),
+            onPressed: _marcarListoYAvisar,
           ),
-          onPressed: _marcarListoYAvisar,
-        ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
+        ],
 
         // Fila de botones secundarios: Registrar Pago + Cambiar Estado
         Row(
@@ -640,7 +712,11 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.payment_rounded, size: 18),
                 label: const Text('Registrar Pago'),
-                onPressed: () => _abrirDialogoPago(orden.saldoPendiente),
+                // Sin saldo no hay nada que cobrar, y forzarlo dejaría la
+                // orden con dinero a favor del cliente.
+                onPressed: orden.saldoPendiente <= 0
+                    ? null
+                    : () => _abrirDialogoPago(orden.saldoPendiente),
               ),
             ),
             const SizedBox(width: 10),
@@ -652,6 +728,13 @@ class _DetalleOrdenScreenState extends ConsumerState<DetalleOrdenScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.tune_rounded, size: 18),
+          label: const Text('Editar prioridad, plazo y descuento'),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+          onPressed: () => _abrirDialogoEdicion(orden),
         ),
       ],
     );

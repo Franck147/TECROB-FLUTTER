@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 
 class StatusHelper {
+  /// Los estados que acepta la columna orden.estado. Cualquiera que falte aquí
+  /// queda fuera del diálogo de cambio de estado y por tanto es inalcanzable.
   static const List<String> todosLosEstados = [
     'pendiente',
     'diagnostico',
@@ -9,6 +11,7 @@ class StatusHelper {
     'listo',
     'entregado',
     'cancelado',
+    'sin_reparacion',
   ];
 
   static const List<String> etiquetasEstados = [
@@ -18,7 +21,27 @@ class StatusHelper {
     'Listo',
     'Entregado',
     'Cancelado',
+    'Sin reparación',
   ];
+
+  /// Estados en los que la orden ya está cerrada: ni cuenta como trabajo
+  /// activo del taller ni puede seguir acumulando retraso.
+  static const List<String> estadosCerrados = [
+    'entregado',
+    'cancelado',
+    'sin_reparacion',
+  ];
+
+  static bool estaCerrada(String? estado) =>
+      estado != null && estadosCerrados.contains(estado.toLowerCase());
+
+  /// Las prioridades que acepta la columna orden.prioridad, con su etiqueta.
+  static const Map<String, String> prioridades = {
+    'baja': 'Baja',
+    'normal': 'Normal',
+    'alta': 'Alta',
+    'urgente': 'Urgente',
+  };
 
   static String obtenerTexto(String? estado) {
     if (estado == null) return 'Desconocido';
@@ -115,10 +138,14 @@ class StatusHelper {
         return 'Computadora';
       case 'impresora':
         return 'Impresora';
+      case 'fotocopiadora':
+        return 'Fotocopiadora';
       case 'tablet':
         return 'Tablet';
       case 'celular':
         return 'Celular';
+      case 'parlante':
+        return 'Parlante';
       case 'otro':
       default:
         return 'Otro';
@@ -135,10 +162,14 @@ class StatusHelper {
         return Icons.desktop_windows_rounded;
       case 'impresora':
         return Icons.print_rounded;
+      case 'fotocopiadora':
+        return Icons.local_printshop_rounded;
       case 'tablet':
         return Icons.tablet_mac_rounded;
       case 'celular':
         return Icons.smartphone_rounded;
+      case 'parlante':
+        return Icons.speaker_rounded;
       default:
         return Icons.devices_rounded;
     }

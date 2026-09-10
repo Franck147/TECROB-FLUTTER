@@ -40,16 +40,24 @@ class DateFormatter {
     }
   }
 
+  static const List<String> _dias = [
+    'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+  ];
+
+  static const List<String> _meses = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+
   static String obtenerFechaHoy() {
-    final now = DateTime.now();
-    final dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    final meses = [
-      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-    ];
-    final diaSemana = dias[now.weekday % 7];
-    final mes = meses[now.month - 1];
-    return '$diaSemana, ${now.day} de $mes de ${now.year}';
+    return formatearFechaLarga(DateTime.now());
+  }
+
+  /// Fecha en castellano sin depender de los datos de idioma de `intl`.
+  static String formatearFechaLarga(DateTime fecha) {
+    final diaSemana = _dias[fecha.weekday % 7];
+    final mes = _meses[fecha.month - 1];
+    return '$diaSemana, ${fecha.day} de $mes de ${fecha.year}';
   }
 
   static String fechaAFormatoIso(DateTime date) {

@@ -169,7 +169,7 @@ class _CreateTecnicoDialogState extends State<CreateTecnicoDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.rojoPrimario,
+            backgroundColor: AppColors.primario,
             foregroundColor: Colors.white,
           ),
           child: const Text('Crear Usuario'),

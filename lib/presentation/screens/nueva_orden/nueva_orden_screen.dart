@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/pdf_invoice_service.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../core/utils/status_helper.dart';
-import '../../../data/models/cliente_model.dart';
-import '../../../data/models/servicio_catalogo_model.dart';
+import '../../../data/models/orden_model.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/create_service_dialog.dart';
-import '../../widgets/custom_text_field.dart';
 import '../../widgets/imprimir_stickers_dialog.dart';
+import 'nueva_orden_formulario.dart';
+import 'widgets/paso_cliente.dart';
+import 'widgets/paso_equipo.dart';
+import 'widgets/paso_servicios.dart';
+import 'widgets/resumen_orden_sheet.dart';
+import 'widgets/wizard_widgets.dart';
 
+/// Recepción de un equipo, dividida en tres pasos cortos.
+///
+/// La pantalla sólo orquesta: guarda el estado del formulario, valida el paso
+/// visible antes de dejar avanzar, y al final delega el guardado en los
+/// repositorios. Cada paso vive en su propio archivo bajo `widgets/`.
 class NuevaOrdenScreen extends ConsumerStatefulWidget {
   final VoidCallback onOrderCreated;
 
@@ -21,181 +30,199 @@ class NuevaOrdenScreen extends ConsumerStatefulWidget {
 }
 
 class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
-  final _formKey = GlobalKey<FormState>();
+  static const List<String> _etiquetasPasos = ['Cliente', 'Equipo', 'Cobro'];
 
-  // Controladores Cliente
-  final _dniController = TextEditingController();
-  final _nombreClienteController = TextEditingController();
-  final _apellidoClienteController = TextEditingController();
-  final _telefonoClienteController = TextEditingController();
-  final _emailClienteController = TextEditingController();
+  final _datos = NuevaOrdenFormulario();
+  final _scrollController = ScrollController();
 
-  ClienteModel? _clienteSeleccionado;
-  bool _buscandoDni = false;
-  String? _dniMensajeEstado;
-
-  // Controladores Equipo
-  String _tipoEquipo = 'laptop';
-  final _marcaController = TextEditingController();
-  final _modeloController = TextEditingController();
-  final _serieController = TextEditingController();
-  final _desperfectoController = TextEditingController();
-  final _descripcionController = TextEditingController();
-  final _contrasenaController = TextEditingController();
-  final _accesorioPersonalizadoController = TextEditingController();
-
-  // Accesorios
-  final List<String> _accesoriosDisponibles = [
-    'Cargador',
-    'Mouse',
-    'Mochila / Funda',
-    'Cable de Poder',
-    'Batería',
-    'Memoria USB',
-    'Teclado',
-  ];
-  final Set<String> _accesoriosSeleccionados = {};
-
-  // Servicios
-  final List<ServicioCatalogoModel> _serviciosSeleccionados = [];
-
-  // Parámetros Orden
-  String _prioridad = 'normal';
-  DateTime? _fechaPrometida;
-  final _adelantoController = TextEditingController();
-
+  int _paso = 0;
   bool _guardando = false;
 
   @override
   void dispose() {
-    _dniController.dispose();
-    _nombreClienteController.dispose();
-    _apellidoClienteController.dispose();
-    _telefonoClienteController.dispose();
-    _emailClienteController.dispose();
-    _marcaController.dispose();
-    _modeloController.dispose();
-    _serieController.dispose();
-    _desperfectoController.dispose();
-    _descripcionController.dispose();
-    _contrasenaController.dispose();
-    _accesorioPersonalizadoController.dispose();
-    _adelantoController.dispose();
+    _datos.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _buscarDni(String dniInput) async {
-    final dni = dniInput.replaceAll(RegExp(r'\D'), '').trim();
+  void _refrescar() => setState(() {});
+
+  // ── Navegación entre pasos ──
+
+  /// Clave del formulario que corresponde al paso visible.
+  GlobalKey<FormState> get _claveFormActual {
+    if (_paso == 0) return _datos.claveFormCliente;
+    if (_paso == 1) return _datos.claveFormEquipo;
+    return _datos.claveFormCobro;
+  }
+
+  bool _validarPasoActual() {
+    final estado = _claveFormActual.currentState;
+    if (estado == null) return true;
+    if (estado.validate()) return true;
+
+    _avisar('Revisa los campos marcados antes de continuar');
+    return false;
+  }
+
+  void _irA(int paso) {
+    setState(() => _paso = paso);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _avanzar() {
+    if (!_validarPasoActual()) return;
+    if (_paso < _etiquetasPasos.length - 1) {
+      _irA(_paso + 1);
+    } else {
+      _revisarYRegistrar();
+    }
+  }
+
+  void _retroceder() {
+    if (_paso > 0) _irA(_paso - 1);
+  }
+
+  void _avisar(String mensaje, {bool esError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(mensaje),
+          backgroundColor: esError ? AppColors.errorOf(context) : null,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  // ── Búsqueda de cliente por documento ──
+
+  Future<void> _buscarDni(String dniIngresado) async {
+    final dni = dniIngresado.replaceAll(RegExp(r'\D'), '').trim();
     if (dni.length != 8) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('El DNI debe tener exactamente 8 dígitos numéricos.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      _avisar('El DNI debe tener exactamente 8 dígitos numéricos.');
       return;
     }
 
     setState(() {
-      _buscandoDni = true;
-      _dniMensajeEstado = null;
+      _datos.buscandoDni = true;
+      _datos.dniMensaje = null;
     });
 
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
+    final empresaId = ref.read(authProvider).tecnico?.empresaId;
 
-    // 1. Buscar en BD local de Supabase de la empresa (si hay empresaId)
+    // 1. Cliente ya registrado en la base de la empresa.
     if (empresaId != null) {
       try {
-        final clienteRepo = ref.read(clienteRepositoryProvider);
-        final clienteExistente = await clienteRepo.buscarClientePorDni(empresaId, dni);
+        final existente =
+            await ref.read(clienteRepositoryProvider).buscarClientePorDni(empresaId, dni);
 
-        if (clienteExistente != null) {
+        if (existente != null) {
+          if (!mounted) return;
           setState(() {
-            _clienteSeleccionado = clienteExistente;
-            _buscandoDni = false;
-            _nombreClienteController.text = clienteExistente.nombre;
-            _apellidoClienteController.text = clienteExistente.apellido ?? '';
-            if (clienteExistente.telefono != null && clienteExistente.telefono!.isNotEmpty) {
-              _telefonoClienteController.text = clienteExistente.telefono!;
+            _datos.buscandoDni = false;
+            _datos.clienteSeleccionado = existente;
+            _datos.nombre.text = existente.nombre;
+            _datos.apellido.text = existente.apellido ?? '';
+            if (existente.telefono != null && existente.telefono!.isNotEmpty) {
+              _datos.telefono.text = existente.telefono!;
             }
-            if (clienteExistente.email != null && clienteExistente.email!.isNotEmpty) {
-              _emailClienteController.text = clienteExistente.email!;
+            if (existente.email != null && existente.email!.isNotEmpty) {
+              _datos.email.text = existente.email!;
             }
-            _dniMensajeEstado = '✓ Cliente registrado en el sistema: ${clienteExistente.nombreCompleto}';
+            _datos.dniMensajeEsExito = true;
+            _datos.dniMensaje = 'Cliente ya registrado: ${existente.nombreCompleto}';
           });
           return;
         }
       } catch (e) {
-        debugPrint('Aviso: Error buscando cliente en BD local: $e');
+        debugPrint('Aviso: error buscando cliente en la base local: $e');
       }
     }
 
-    // 2. Consultar a la API de RENIEC (ApisPeru)
-    final dniService = ref.read(dniServiceProvider);
-    final datosDni = await dniService.consultarDni(dni);
+    // 2. Consulta a RENIEC a través de ApisPeru.
+    final datosDni = await ref.read(dniServiceProvider).consultarDni(dni);
+    if (!mounted) return;
 
     setState(() {
-      _buscandoDni = false;
-      _clienteSeleccionado = null;
-      if (datosDni != null && datosDni.nombres != null && datosDni.nombres!.trim().isNotEmpty) {
-        _nombreClienteController.text = datosDni.nombres!.trim();
-        _apellidoClienteController.text = datosDni.apellidosCompletos;
-        _dniMensajeEstado = '✓ Datos obtenidos de RENIEC: ${datosDni.nombreCompleto}. Ingresa su celular.';
+      _datos.buscandoDni = false;
+      _datos.clienteSeleccionado = null;
+
+      final nombres = datosDni?.nombres?.trim() ?? '';
+      if (nombres.isNotEmpty) {
+        _datos.nombre.text = nombres;
+        _datos.apellido.text = datosDni!.apellidosCompletos;
+        _datos.dniMensajeEsExito = true;
+        _datos.dniMensaje =
+            'Datos traídos de RENIEC: ${datosDni.nombreCompleto}. Falta el celular.';
       } else {
-        _dniMensajeEstado = 'ℹ️ DNI no encontrado en RENIEC. Ingrésalo manualmente abajo.';
+        _datos.dniMensajeEsExito = false;
+        _datos.dniMensaje = 'DNI no encontrado en RENIEC. Escribe los datos a mano.';
       }
     });
   }
 
-  void _abrirSelectorServicios() {
-    final catalogoState = ref.read(catalogoProvider);
-    final todos = catalogoState.todosLosServicios;
-    final seleccionTemp = Set<int>.from(_serviciosSeleccionados.map((s) => s.id));
+  // ── Catálogo de servicios ──
 
-    showDialog(
+  void _abrirSelectorServicios() {
+    final servicios = ref.read(catalogoProvider).todosLosServicios;
+    final seleccion = _datos.servicios.map((s) => s.id).toSet();
+
+    showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
+        builder: (ctx, actualizarDialogo) {
           return AlertDialog(
-            backgroundColor: AppColors.fondoTarjeta,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: AppColors.fondoBorde),
+            title: const Text(
+              'Servicios del catálogo',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
-            title: const Text('Seleccionar Servicios del Catálogo',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
             content: SizedBox(
               width: double.maxFinite,
-              child: todos.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text('No hay servicios en el catálogo',
-                          style: TextStyle(color: AppColors.textoSecundario)),
+              child: servicios.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
+                      child: Text(
+                        'Todavía no hay servicios en el catálogo. Crea el primero desde el '
+                        'botón de abajo.',
+                        style: TextStyle(color: AppColors.textoSecundarioOf(ctx), fontSize: 13),
+                      ),
                     )
                   : ListView.builder(
                       shrinkWrap: true,
-                      itemCount: todos.length,
-                      itemBuilder: (context, index) {
-                        final serv = todos[index];
-                        final isChecked = seleccionTemp.contains(serv.id);
+                      itemCount: servicios.length,
+                      itemBuilder: (_, i) {
+                        final servicio = servicios[i];
                         return CheckboxListTile(
-                          title: Text(serv.nombre,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                            serv.precioFormateado,
-                            style: const TextStyle(color: AppColors.rojoClaro, fontSize: 12),
+                          dense: true,
+                          title: Text(
+                            servicio.nombre,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
-                          value: isChecked,
-                          activeColor: AppColors.rojoPrimario,
-                          onChanged: (val) {
-                            setModalState(() {
-                              if (val == true) {
-                                seleccionTemp.add(serv.id);
+                          subtitle: Text(
+                            '${servicio.categoriaFormateada} · ${servicio.precioFormateado}',
+                            style: TextStyle(
+                              color: AppColors.textoSecundarioOf(ctx),
+                              fontSize: 12,
+                            ),
+                          ),
+                          value: seleccion.contains(servicio.id),
+                          activeColor: AppColors.primarioOf(ctx),
+                          onChanged: (marcado) {
+                            actualizarDialogo(() {
+                              if (marcado == true) {
+                                seleccion.add(servicio.id);
                               } else {
-                                seleccionTemp.remove(serv.id);
+                                seleccion.remove(servicio.id);
                               }
                             });
                           },
@@ -206,24 +233,21 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancelar', style: TextStyle(color: AppColors.textoSecundario)),
+                child: const Text('Cancelar'),
               ),
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _crearNuevoServicioEnCaliente();
+                  _crearServicioEnCaliente();
                 },
-                child: const Text('Nuevo Servicio'),
+                child: const Text('Nuevo servicio'),
               ),
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    _serviciosSeleccionados.clear();
-                    for (var s in todos) {
-                      if (seleccionTemp.contains(s.id)) {
-                        _serviciosSeleccionados.add(s);
-                      }
-                    }
+                    _datos.servicios
+                      ..clear()
+                      ..addAll(servicios.where((s) => seleccion.contains(s.id)));
                   });
                   Navigator.of(ctx).pop();
                 },
@@ -236,245 +260,205 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     );
   }
 
-  void _crearNuevoServicioEnCaliente() {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
+  void _crearServicioEnCaliente() {
+    final empresaId = ref.read(authProvider).tecnico?.empresaId;
     if (empresaId == null) return;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => CreateServiceDialog(
-        onSave: (datos) async {
-          final ok = await ref.read(catalogoProvider.notifier).agregarServicio(empresaId, datos);
-          if (ok) {
-            _abrirSelectorServicios();
-          }
+        onSave: (nuevo) async {
+          final creado =
+              await ref.read(catalogoProvider.notifier).agregarServicio(empresaId, nuevo);
+          if (creado && mounted) _abrirSelectorServicios();
         },
       ),
     );
   }
 
+  // ── Registro de la orden ──
+
+  Future<void> _revisarYRegistrar() async {
+    if (!_validarPasoActual()) return;
+
+    // Los pasos anteriores ya no están montados, así que se revisan a mano.
+    if (_datos.nombre.text.trim().isEmpty || _datos.telefono.text.trim().isEmpty) {
+      _avisar('Faltan datos del cliente', esError: true);
+      _irA(0);
+      return;
+    }
+    if (_datos.marca.text.trim().isEmpty || _datos.desperfecto.text.trim().isEmpty) {
+      _avisar('Faltan datos del equipo', esError: true);
+      _irA(1);
+      return;
+    }
+
+    final confirmado = await ResumenOrdenSheet.mostrar(context, _datos);
+    if (confirmado && mounted) await _guardarOrden();
+  }
+
   Future<void> _guardarOrden() async {
-    final nombreCliente = _nombreClienteController.text.trim();
-    if (nombreCliente.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el nombre del cliente')),
-      );
-      return;
-    }
-
-    final telefonoCliente = _telefonoClienteController.text.trim();
-    if (telefonoCliente.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el número de celular del cliente')),
-      );
-      return;
-    }
-
-    if (_marcaController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa la marca del equipo')),
-      );
-      return;
-    }
-
-    if (_desperfectoController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el desperfecto del equipo')),
-      );
-      return;
-    }
-
     final auth = ref.read(authProvider);
     final empresaId = auth.tecnico?.empresaId;
     final tecnicoId = auth.tecnico?.id;
 
-    if (empresaId == null || tecnicoId == null) return;
+    if (empresaId == null || tecnicoId == null) {
+      _avisar('Tu sesión no tiene una empresa asignada', esError: true);
+      return;
+    }
 
     setState(() => _guardando = true);
 
     try {
-      int clienteId;
-
-      if (_clienteSeleccionado != null) {
-        clienteId = _clienteSeleccionado!.id;
-        // Actualizar datos del cliente por si se corrigieron
-        await ref.read(clienteRepositoryProvider).actualizarCliente(clienteId, {
-          'nombre': nombreCliente,
-          if (_apellidoClienteController.text.trim().isNotEmpty)
-            'apellido': _apellidoClienteController.text.trim(),
-          if (telefonoCliente.isNotEmpty)
-            'telefono': telefonoCliente,
-          if (_emailClienteController.text.trim().isNotEmpty)
-            'email': _emailClienteController.text.trim(),
-          if (_dniController.text.trim().isNotEmpty)
-            'dni': _dniController.text.trim(),
-        });
-      } else {
-        // Crear cliente nuevo automáticamente
-        final nuevo = await ref.read(clienteRepositoryProvider).crearCliente({
-          'empresa_id': empresaId,
-          'nombre': nombreCliente,
-          'apellido': _apellidoClienteController.text.trim().isNotEmpty
-              ? _apellidoClienteController.text.trim()
-              : null,
-          'dni': _dniController.text.trim().isNotEmpty
-              ? _dniController.text.trim()
-              : null,
-          'telefono': telefonoCliente.isNotEmpty ? telefonoCliente : null,
-          'email': _emailClienteController.text.trim().isNotEmpty
-              ? _emailClienteController.text.trim()
-              : null,
-        });
-        clienteId = nuevo.id;
-      }
-
-      final adelantoVal = double.tryParse(_adelantoController.text.trim()) ?? 0.0;
-
-      final datosOrden = {
+      final datosOrden = <String, dynamic>{
         'empresa_id': empresaId,
-        'cliente_id': clienteId,
         'tecnico_id': tecnicoId,
         'estado': 'pendiente',
-        'prioridad': _prioridad,
-        'adelanto': adelantoVal,
+        'prioridad': _datos.prioridad,
+        'adelanto': _datos.montoAdelanto,
+        'metodo_adelanto': _datos.metodoAdelanto,
         'descuento': 0.0,
-        if (_contrasenaController.text.trim().isNotEmpty)
-          'contrasena_equipo': _contrasenaController.text.trim(),
-        if (_fechaPrometida != null)
-          'fecha_prometida': DateFormatter.fechaAFormatoIso(_fechaPrometida!),
+        if (_datos.contrasena.text.trim().isNotEmpty)
+          'contrasena_equipo': _datos.contrasena.text.trim(),
+        if (_datos.fechaPrometida != null)
+          'fecha_prometida': DateFormatter.fechaAFormatoIso(_datos.fechaPrometida!),
       };
 
-      final datosEquipo = {
-        'tipo': _tipoEquipo,
-        'marca': _marcaController.text.trim(),
-        if (_modeloController.text.trim().isNotEmpty)
-          'modelo': _modeloController.text.trim(),
-        if (_serieController.text.trim().isNotEmpty)
-          'numero_serie': _serieController.text.trim(),
-        'desperfecto': _desperfectoController.text.trim(),
-        if (_descripcionController.text.trim().isNotEmpty)
-          'descripcion_general': _descripcionController.text.trim(),
-        if (_accesoriosSeleccionados.isNotEmpty)
-          'accesorios': _accesoriosSeleccionados.join(', '),
+      final datosEquipo = <String, dynamic>{
+        'tipo': _datos.tipoEquipo,
+        'marca': _datos.marca.text.trim(),
+        if (_datos.modelo.text.trim().isNotEmpty) 'modelo': _datos.modelo.text.trim(),
+        if (_datos.serie.text.trim().isNotEmpty) 'numero_serie': _datos.serie.text.trim(),
+        'desperfecto': _datos.desperfecto.text.trim(),
+        if (_datos.descripcion.text.trim().isNotEmpty)
+          'descripcion_general': _datos.descripcion.text.trim(),
+        if (_datos.accesorios.isNotEmpty) 'accesorios': _datos.accesorios.join(', '),
       };
 
-      final ordenCreada = await ref.read(ordenRepositoryProvider).crearOrdenCompleta(
-            empresaId: empresaId,
-            tecnicoId: tecnicoId,
+      final orden = await ref.read(ordenRepositoryProvider).crearOrdenCompleta(
+            datosCliente: _datosCliente(empresaId),
             datosOrden: datosOrden,
             datosEquipo: datosEquipo,
-            servicios: _serviciosSeleccionados,
+            servicios: _datos.servicios,
           );
 
-      if (mounted) {
-        _limpiarFormulario();
-        _mostrarModalExito(ordenCreada);
-      }
+      if (!mounted) return;
+      setState(() {
+        _datos.limpiar();
+        _paso = 0;
+      });
+      _mostrarModalExito(orden);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar orden: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      if (mounted) _avisar('No se pudo guardar la orden: $e', esError: true);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
   }
 
-  void _mostrarModalExito(dynamic orden) {
-    showDialog(
+  /// Los datos del cliente tal como viajan a la función de base.
+  ///
+  /// Si lleva id, la función actualiza ese cliente; si no, lo crea. Va en la
+  /// misma llamada que la orden a propósito: guardarlo antes por separado
+  /// dejaba el cliente escrito aunque la orden fallara después.
+  Map<String, dynamic> _datosCliente(int empresaId) {
+    final apellido = _datos.apellido.text.trim();
+    final telefono = _datos.telefono.text.trim();
+    final email = _datos.email.text.trim();
+    final dni = _datos.dni.text.trim();
+    final existente = _datos.clienteSeleccionado;
+
+    return {
+      if (existente != null) 'id': existente.id,
+      'empresa_id': empresaId,
+      'nombre': _datos.nombre.text.trim(),
+      if (apellido.isNotEmpty) 'apellido': apellido,
+      if (dni.isNotEmpty) 'dni': dni,
+      if (telefono.isNotEmpty) 'telefono': telefono,
+      if (email.isNotEmpty) 'email': email,
+    };
+  }
+
+  void _mostrarModalExito(OrdenModel orden) {
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.fondoTarjetaOf(context),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: AppColors.fondoBordeOf(context), width: 1.2),
-        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.tertiary.withValues(alpha: 0.12),
+                color: AppColors.exitoOf(ctx).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.tertiary.withValues(alpha: 0.4)),
+                border: Border.all(color: AppColors.exitoOf(ctx).withValues(alpha: 0.4)),
               ),
-              child: const Icon(Icons.check_rounded, color: AppColors.tertiary, size: 36),
+              child: Icon(Icons.check_rounded, color: AppColors.exitoOf(ctx), size: 36),
             ),
             const SizedBox(height: 16),
             Text(
-              '¡Orden ${orden.codigoVisual} Registrada!',
+              'Orden ${orden.codigoVisual} registrada',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textoPrincipalOf(context),
+                fontWeight: FontWeight.w700,
+                color: AppColors.textoPrincipalOf(ctx),
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              'Cliente: ${orden.clienteNombreCompleto}\n${orden.equipo?.nombreCompleto ?? ""}',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textoSecundarioOf(context)),
+              '${orden.clienteNombreCompleto}\n${orden.equipo?.nombreCompleto ?? ''}',
               textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: AppColors.textoSecundarioOf(ctx)),
             ),
             const SizedBox(height: 20),
-            // Botón 1: Stickers Bluetooth
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  showDialog(
+                  showDialog<void>(
                     context: context,
                     builder: (_) => ImprimirStickersDialog(orden: orden),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.rojoPrimario,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
                 icon: const Icon(Icons.bluetooth_audio_rounded, size: 18),
-                label: const Text(
-                  '🏷️ Imprimir Stickers de Accesorios',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
+                label: const Text('Imprimir stickers de accesorios'),
               ),
             ),
             const SizedBox(height: 8),
-            // Botón 2: Comprobante PDF
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  PdfInvoiceService.imprimirOCompartir(orden);
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: AppColors.fondoBorde),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      PdfInvoiceService.imprimirOCompartir(orden);
+                    },
+                    icon: const Icon(Icons.print_outlined, size: 17),
+                    label: const Text('Imprimir A4', style: TextStyle(fontSize: 12.5)),
+                  ),
                 ),
-                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18, color: AppColors.rojoClaro),
-                label: const Text(
-                  '📄 Comprobante PDF de Recepción',
-                  style: TextStyle(fontSize: 13),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      PdfInvoiceService.compartirCopiaCliente(orden);
+                    },
+                    icon: const Icon(Icons.send_outlined, size: 17),
+                    label: const Text('Enviar copia', style: TextStyle(fontSize: 12.5)),
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 8),
-            // Botón 3: Ir a lista
+            const SizedBox(height: 4),
             TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 widget.onOrderCreated();
               },
-              child: const Text('Continuar a la lista de órdenes',
-                  style: TextStyle(color: AppColors.textoSecundario, fontSize: 12.5)),
+              child: const Text('Ir a la lista de órdenes'),
             ),
           ],
         ),
@@ -482,559 +466,131 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
     );
   }
 
-  void _limpiarFormulario() {
-    setState(() {
-      _clienteSeleccionado = null;
-      _dniController.clear();
-      _nombreClienteController.clear();
-      _apellidoClienteController.clear();
-      _telefonoClienteController.clear();
-      _emailClienteController.clear();
-      _dniMensajeEstado = null;
-      _marcaController.clear();
-      _modeloController.clear();
-      _serieController.clear();
-      _desperfectoController.clear();
-      _descripcionController.clear();
-      _contrasenaController.clear();
-      _accesorioPersonalizadoController.clear();
-      _adelantoController.clear();
-      _tipoEquipo = 'laptop';
-      _prioridad = 'normal';
-      _fechaPrometida = null;
-      _accesoriosSeleccionados.clear();
-      _serviciosSeleccionados.clear();
-    });
-  }
+  // ── Construcción ──
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.fondoPrincipalOf(context),
       appBar: AppBar(
-        backgroundColor: AppColors.fondoPrincipalOf(context),
-        title: const Text('Nueva Orden de Servicio'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── 1. SECCIÓN CLIENTE ──
-              _buildSectionCard(
-                titulo: '1. DATOS DEL CLIENTE',
-                icono: Icons.person_search_rounded,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Buscador de DNI con Botón de Búsqueda
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _dniController,
-                            label: 'DNI del Cliente (8 dígitos)',
-                            hint: 'Ingresa DNI para consultar RENIEC o BD...',
-                            keyboardType: TextInputType.number,
-                            prefixIcon: Icons.badge_outlined,
-                            suffixIcon: _dniController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, size: 18),
-                                    onPressed: () {
-                                      setState(() {
-                                        _dniController.clear();
-                                        _dniMensajeEstado = null;
-                                        _clienteSeleccionado = null;
-                                        _nombreClienteController.clear();
-                                        _apellidoClienteController.clear();
-                                        _telefonoClienteController.clear();
-                                        _emailClienteController.clear();
-                                      });
-                                    },
-                                  )
-                                : null,
-                            onChanged: (val) {
-                              if (val.trim().length == 8) {
-                                _buscarDni(val.trim());
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _buscandoDni
-                                ? null
-                                : () => _buscarDni(_dniController.text.trim()),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.rojoContenedorOf(context),
-                              foregroundColor: AppColors.rojoPrimario,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                side: BorderSide(
-                                  color: AppColors.rojoPrimario.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                            ),
-                            child: _buscandoDni
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.rojoPrimario,
-                                    ),
-                                  )
-                                : const Icon(Icons.search_rounded, size: 22),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    if (_dniMensajeEstado != null) ...[
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _dniMensajeEstado!.startsWith('✓')
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.info_outline_rounded,
-                              size: 15,
-                              color: _dniMensajeEstado!.startsWith('✓')
-                                  ? AppColors.tertiary
-                                  : AppColors.secondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _dniMensajeEstado!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _dniMensajeEstado!.startsWith('✓')
-                                      ? AppColors.tertiary
-                                      : AppColors.secondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 14),
-
-                    // Campos de Nombre y Apellido (Siempre visibles)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _nombreClienteController,
-                            label: 'Nombres *',
-                            hint: 'Ej. Juan Carlos',
-                            textCapitalization: TextCapitalization.words,
-                            prefixIcon: Icons.person_outline_rounded,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _apellidoClienteController,
-                            label: 'Apellidos',
-                            hint: 'Ej. Pérez Quispe',
-                            textCapitalization: TextCapitalization.words,
-                            prefixIcon: Icons.person_outline_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Campos de Teléfono / Celular y Email (Siempre visibles)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _telefonoClienteController,
-                            label: 'Celular WhatsApp *',
-                            hint: 'Ej. 987654321',
-                            keyboardType: TextInputType.phone,
-                            prefixIcon: Icons.phone_android_rounded,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _emailClienteController,
-                            label: 'Correo Electrónico (opcional)',
-                            hint: 'cliente@gmail.com',
-                            keyboardType: TextInputType.emailAddress,
-                            prefixIcon: Icons.alternate_email_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // ── 2. SECCIÓN EQUIPO ──
-              _buildSectionCard(
-                titulo: '2. DATOS DEL EQUIPO',
-                icono: Icons.devices_other_rounded,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Tipo de Equipo:',
-                        style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: ['laptop', 'computadora', 'impresora', 'tablet', 'celular', 'otro']
-                          .map((tipo) {
-                        final isSel = _tipoEquipo == tipo;
-                        return ChoiceChip(
-                          avatar: Icon(
-                            StatusHelper.obtenerIconoEquipo(tipo),
-                            size: 16,
-                            color: isSel ? AppColors.rojoClaro : AppColors.textoSecundario,
-                          ),
-                          label: Text(tipo.toUpperCase()),
-                          selected: isSel,
-                          onSelected: (selected) {
-                            if (selected) setState(() => _tipoEquipo = tipo);
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _marcaController,
-                            label: 'Marca *',
-                            hint: 'Ej. Lenovo, HP, Dell...',
-                            textCapitalization: TextCapitalization.characters,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _modeloController,
-                            label: 'Modelo',
-                            hint: 'Ej. ThinkPad E14...',
-                            textCapitalization: TextCapitalization.characters,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _serieController,
-                            label: 'N° de Serie',
-                            hint: 'Opcional',
-                            textCapitalization: TextCapitalization.characters,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _contrasenaController,
-                            label: 'PIN / Clave',
-                            hint: 'Contraseña de equipo',
-                            textCapitalization: TextCapitalization.characters,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    CustomTextField(
-                      controller: _desperfectoController,
-                      label: 'Problema / Falla Reportada *',
-                      hint: 'Describe la falla que reporta el cliente...',
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Accesorios con rotulado
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Accesorios Entregados (Se generará sticker para c/u):',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textoSecundario,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _accesoriosDisponibles.map((acc) {
-                        final isSel = _accesoriosSeleccionados.contains(acc);
-                        return FilterChip(
-                          label: Text(acc),
-                          selected: isSel,
-                          onSelected: (val) {
-                            setState(() {
-                              if (val) {
-                                _accesoriosSeleccionados.add(acc);
-                              } else {
-                                _accesoriosSeleccionados.remove(acc);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _accesorioPersonalizadoController,
-                            label: 'Otro accesorio...',
-                            hint: 'Ej. Funda cuero, Cable HDMI...',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            final custom = _accesorioPersonalizadoController.text.trim();
-                            if (custom.isNotEmpty) {
-                              setState(() {
-                                _accesoriosSeleccionados.add(custom);
-                                _accesorioPersonalizadoController.clear();
-                              });
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.fondoSuperficie,
-                            foregroundColor: AppColors.textoPrincipal,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                          ),
-                          child: const Text('Agregar'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // ── 3. SECCIÓN SERVICIOS & PARÁMETROS ──
-              _buildSectionCard(
-                titulo: '3. SERVICIOS Y RECEPCIÓN',
-                icono: Icons.build_circle_outlined,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Servicios agregados:',
-                          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
-                        ),
-                        TextButton.icon(
-                          onPressed: _abrirSelectorServicios,
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('Catálogo'),
-                        ),
-                      ],
-                    ),
-                    if (_serviciosSeleccionados.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.fondoSuperficie,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.fondoBorde),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textoMuted),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Puedes añadir servicios ahora o después durante el diagnóstico.',
-                                style: TextStyle(fontSize: 12, color: AppColors.textoMuted),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ..._serviciosSeleccionados.map(
-                        (serv) => Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.fondoSuperficie,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(serv.nombre, style: const TextStyle(fontSize: 13)),
-                              Row(
-                                children: [
-                                  Text(serv.precioFormateado,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.rojoClaro)),
-                                  IconButton(
-                                    icon: const Icon(Icons.close_rounded,
-                                        size: 16, color: AppColors.textoMuted),
-                                    onPressed: () {
-                                      setState(() => _serviciosSeleccionados.remove(serv));
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Prioridad:',
-                                  style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<String>(
-                                initialValue: _prioridad,
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'baja', child: Text('Baja')),
-                                  DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                                  DropdownMenuItem(value: 'alta', child: Text('Alta (Urgente)')),
-                                ],
-                                onChanged: (v) {
-                                  if (v != null) setState(() => _prioridad = v);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _adelantoController,
-                            label: 'Adelanto S/',
-                            hint: '0.00',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            prefixIcon: Icons.attach_money_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Botón Guardar Orden
-              SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _guardando ? null : _guardarOrden,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.rojoPrimario,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 4,
-                  ),
-                  icon: _guardando
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.check_circle_outline_rounded, size: 22),
-                  label: Text(
-                    _guardando ? 'Guardando Orden...' : 'REGISTRAR ORDEN DE SERVICIO',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+        title: const Text('Nueva orden'),
+        actions: [
+          TextButton(
+            onPressed: _guardando
+                ? null
+                : () {
+                    setState(() {
+                      _datos.limpiar();
+                      _paso = 0;
+                    });
+                    _avisar('Formulario vaciado');
+                  },
+            child: const Text('Limpiar'),
+          ),
+          const SizedBox(width: 4),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(74),
+          child: Container(
+            color: Theme.of(context).appBarTheme.backgroundColor,
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: BarraPasos(
+              pasoActual: _paso,
+              etiquetas: _etiquetasPasos,
+              onTocarPaso: _guardando ? null : _irA,
+            ),
           ),
         ),
       ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: _construirPaso(),
+        ),
+      ),
+      bottomNavigationBar: _construirBarraAcciones(),
     );
   }
 
-  Widget _buildSectionCard({
-    required String titulo,
-    required IconData icono,
-    required Widget child,
-  }) {
-    final isDark = AppColors.isDark(context);
+  Widget _construirPaso() {
+    if (_paso == 0) {
+      return PasoCliente(
+        datos: _datos,
+        onBuscarDni: _buscarDni,
+        onCambio: _refrescar,
+      );
+    }
+    if (_paso == 1) {
+      return PasoEquipo(datos: _datos, onCambio: _refrescar);
+    }
+    return PasoServicios(
+      datos: _datos,
+      onAbrirCatalogo: _abrirSelectorServicios,
+      onCambio: _refrescar,
+    );
+  }
+
+  Widget _construirBarraAcciones() {
+    final esUltimo = _paso == _etiquetasPasos.length - 1;
+
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fondoTarjetaOf(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.fondoBordeOf(context), width: 1.1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(top: BorderSide(color: AppColors.fondoBordeOf(context))),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
             children: [
-              Icon(icono, color: AppColors.rojoPrimario, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: AppColors.textoPrincipalOf(context),
+              if (_paso > 0) ...[
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: _guardando ? null : _retroceder,
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: const Text('Atrás'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _guardando ? null : _avanzar,
+                    icon: _guardando
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Icon(
+                            esUltimo
+                                ? Icons.fact_check_outlined
+                                : Icons.arrow_forward_rounded,
+                            size: 19,
+                          ),
+                    label: Text(
+                      _guardando
+                          ? 'Guardando...'
+                          : esUltimo
+                              ? 'Revisar y registrar'
+                              : 'Continuar',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          child,
-        ],
+        ),
       ),
     );
   }

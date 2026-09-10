@@ -66,10 +66,10 @@ class OrdenCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
-                            color: AppColors.rojoContenedorOf(context),
+                            color: AppColors.primarioContenedorOf(context),
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
-                              color: AppColors.rojoPrimario.withValues(alpha: isDark ? 0.3 : 0.2),
+                              color: AppColors.primario.withValues(alpha: isDark ? 0.3 : 0.2),
                             ),
                           ),
                           child: Text(
@@ -77,7 +77,7 @@ class OrdenCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? AppColors.rojoClaro : AppColors.rojoOscuro,
+                              color: isDark ? AppColors.primarioClaro : AppColors.primarioOscuro,
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -167,7 +167,7 @@ class OrdenCard extends StatelessWidget {
                       Icon(
                         tipoEquipoIcon,
                         size: 18,
-                        color: AppColors.rojoPrimario,
+                        color: AppColors.primario,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -320,7 +320,7 @@ class OrdenCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             visualDensity: VisualDensity.compact,
                             side: BorderSide(
-                              color: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                              color: AppColors.primario.withValues(alpha: 0.4),
                               width: 1,
                             ),
                             shape: RoundedRectangleBorder(
@@ -330,7 +330,7 @@ class OrdenCard extends StatelessWidget {
                           icon: const Icon(
                             Icons.bluetooth_audio_rounded,
                             size: 15,
-                            color: AppColors.rojoPrimario,
+                            color: AppColors.primario,
                           ),
                           label: Text(
                             'Stickers',

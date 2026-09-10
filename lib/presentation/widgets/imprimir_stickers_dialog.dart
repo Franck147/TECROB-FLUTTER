@@ -83,15 +83,15 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.rojoContenedorOf(context),
+                    color: AppColors.primarioContenedorOf(context),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.rojoPrimario.withValues(alpha: isDark ? 0.3 : 0.2),
+                      color: AppColors.primario.withValues(alpha: isDark ? 0.3 : 0.2),
                     ),
                   ),
                   child: const Icon(
                     Icons.bluetooth_audio_rounded,
-                    color: AppColors.rojoPrimario,
+                    color: AppColors.primario,
                     size: 24,
                   ),
                 ),
@@ -254,7 +254,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                     _indicesSeleccionados.length == _todosLosItems.length
                         ? 'Deseleccionar todo'
                         : 'Seleccionar todo',
-                    style: const TextStyle(color: AppColors.rojoPrimario, fontSize: 12),
+                    style: const TextStyle(color: AppColors.primario, fontSize: 12),
                   ),
                 ),
               ],
@@ -285,12 +285,12 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (isDark ? AppColors.fondoSuperficieOf(context) : AppColors.rojoContenedorClaro)
+                            ? (isDark ? AppColors.fondoSuperficieOf(context) : AppColors.primarioContenedorClaro)
                             : AppColors.fondoPrincipalOf(context),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.rojoPrimario.withValues(alpha: 0.5)
+                              ? AppColors.primario.withValues(alpha: 0.5)
                               : AppColors.fondoBordeOf(context),
                         ),
                       ),
@@ -300,7 +300,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                             isSelected
                                 ? Icons.check_box_rounded
                                 : Icons.check_box_outline_blank_rounded,
-                            color: isSelected ? AppColors.rojoPrimario : AppColors.textoMutedOf(context),
+                            color: isSelected ? AppColors.primario : AppColors.textoMutedOf(context),
                             size: 20,
                           ),
                           const SizedBox(width: 10),
@@ -312,7 +312,7 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
                                   item.titulo,
                                   style: TextStyle(
                                     color: item.esPrincipal
-                                        ? AppColors.rojoPrimario
+                                        ? AppColors.primario
                                         : AppColors.textoPrincipalOf(context),
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -352,13 +352,13 @@ class _ImprimirStickersDialogState extends State<ImprimirStickersDialog> {
               child: ElevatedButton.icon(
                 onPressed: _imprimiendo ? null : _ejecutarImpresion,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.rojoPrimario,
+                  backgroundColor: AppColors.primario,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 2,
-                  shadowColor: AppColors.rojoPrimario.withValues(alpha: 0.4),
+                  shadowColor: AppColors.primario.withValues(alpha: 0.4),
                 ),
                 icon: _imprimiendo
                     ? const SizedBox(
