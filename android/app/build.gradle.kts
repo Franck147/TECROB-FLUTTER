@@ -7,12 +7,8 @@ plugins {
 android {
     namespace = "com.example.tecrobsys.tecrobsys"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "30.0.16248370"
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols += "**/*.so"
-        }
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
