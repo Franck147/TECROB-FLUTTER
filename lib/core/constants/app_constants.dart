@@ -6,11 +6,14 @@ class AppConstants {
 
   /// Token de la consulta de DNI en ApisPeru.
   ///
-  /// Es una credencial personal, así que no vive en el código: se pasa al
-  /// compilar con --dart-define=DNI_API_TOKEN=... . Si falta, la app funciona
-  /// igual y la búsqueda por DNI queda desactivada.
-  static const String dniApiToken =
-      String.fromEnvironment('DNI_API_TOKEN', defaultValue: '');
+  /// Va escrito aquí a propósito, y se sube al repositorio, para que la app
+  /// funcione con un flutter run normal mientras sea de pruebas. Para probar
+  /// con otro sin tocar el código se puede pasar --dart-define=DNI_API_TOKEN=...
+  static const String dniApiToken = String.fromEnvironment(
+    'DNI_API_TOKEN',
+    defaultValue:
+        'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFkbGVyY2lzbmVyb3MxNDdAZ21haWwuY29tIn0.oXEO8knJ9JOVp6mhAG_T9DKOSqN78IsbWXLTK13-QRo',
+  );
 
   static bool get consultaDniDisponible => dniApiToken.isNotEmpty;
 

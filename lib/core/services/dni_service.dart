@@ -5,6 +5,9 @@ import '../constants/app_constants.dart';
 import '../../data/models/dni_respuesta_model.dart';
 
 class DniService {
+  /// Hay token de ApisPeru, así que la consulta puede hacerse.
+  bool get disponible => AppConstants.consultaDniDisponible;
+
   /// Consulta DNI en ApisPeru con token
   Future<DniRespuestaModel?> consultarDni(String numeroDni) async {
     final dniLimpio = numeroDni.replaceAll(RegExp(r'\D'), '').trim();
@@ -13,7 +16,7 @@ class DniService {
     const token = AppConstants.dniApiToken;
     if (token.isEmpty) {
       debugPrint(
-          'Consulta de DNI desactivada: falta --dart-define=DNI_API_TOKEN');
+          'Consulta de DNI desactivada: el token de ApisPeru está vacío');
       return null;
     }
 
