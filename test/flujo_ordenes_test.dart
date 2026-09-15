@@ -56,7 +56,6 @@ OrdenModel _orden({
   return OrdenModel(
     id: id,
     numeroOrden: 'ORD-${id.toString().padLeft(4, '0')}',
-    empresaId: 1,
     estado: estado,
     subtotal: subtotal,
     descuento: descuento,
@@ -111,9 +110,8 @@ class _RepoFalso extends OrdenRepository {
       : super(SupabaseClient('https://ficticio.supabase.co', 'clave-ficticia'));
 
   @override
-  Future<List<OrdenModel>> listarOrdenes(int empresaId, {String? estado, int? limit}) async {
+  Future<List<OrdenModel>> listarOrdenes({String? estado, int? limit}) async {
     return ordenes
-        .where((o) => o.empresaId == empresaId)
         .where((o) => estado == null || o.estado == estado)
         .toList();
   }
@@ -181,7 +179,7 @@ Future<double?> _cobrar(
 
 Future<DashboardState> _panelCargado(List<OrdenModel> ordenes) async {
   final notifier = DashboardNotifier(_RepoFalso(ordenes));
-  await notifier.cargarDatos(1);
+  await notifier.cargarDatos();
   return notifier.state;
 }
 
@@ -306,7 +304,7 @@ void main() {
   group('listado de órdenes', () {
     test('el filtro por estado deja sólo ese estado', () async {
       final notifier = OrdenesNotifier(_RepoFalso(_tallerDePrueba()));
-      await notifier.cargarOrdenes(1);
+      await notifier.cargarOrdenes();
       notifier.setFiltroEstado('listo');
 
       expect(notifier.state.ordenesFiltradas.map((o) => o.id), [4, 5]);
@@ -314,7 +312,7 @@ void main() {
 
     test('la búsqueda encuentra por número de orden', () async {
       final notifier = OrdenesNotifier(_RepoFalso(_tallerDePrueba()));
-      await notifier.cargarOrdenes(1);
+      await notifier.cargarOrdenes();
       notifier.setBusqueda('ORD-0003');
 
       expect(notifier.state.ordenesFiltradas.map((o) => o.id), [3]);
@@ -322,7 +320,7 @@ void main() {
 
     test('la búsqueda encuentra por nombre de cliente', () async {
       final notifier = OrdenesNotifier(_RepoFalso(_tallerDePrueba()));
-      await notifier.cargarOrdenes(1);
+      await notifier.cargarOrdenes();
       notifier.setBusqueda('cliente 5');
 
       expect(notifier.state.ordenesFiltradas.map((o) => o.id), [5]);
@@ -330,7 +328,7 @@ void main() {
 
     test('la búsqueda encuentra por teléfono del cliente', () async {
       final notifier = OrdenesNotifier(_RepoFalso(_tallerDePrueba()));
-      await notifier.cargarOrdenes(1);
+      await notifier.cargarOrdenes();
       notifier.setBusqueda('93');
 
       expect(notifier.state.ordenesFiltradas.map((o) => o.id), [3]);
@@ -338,21 +336,12 @@ void main() {
 
     test('el filtro de atrasadas descarta el filtro de estado', () async {
       final notifier = OrdenesNotifier(_RepoFalso(_tallerDePrueba()));
-      await notifier.cargarOrdenes(1);
+      await notifier.cargarOrdenes();
       notifier.setFiltroEstado('listo');
       notifier.setSoloVencidas();
 
       expect(notifier.state.filtroEstado, isNull);
       expect(notifier.state.ordenesFiltradas.every((o) => o.estaVencida), isTrue);
-    });
-
-    test('otra empresa no ve las órdenes de esta', () async {
-      final ajena = _orden(id: 90, estado: 'pendiente', subtotal: 10)
-          .copyWith(empresaId: 2);
-      final notifier = OrdenesNotifier(_RepoFalso([..._tallerDePrueba(), ajena]));
-      await notifier.cargarOrdenes(1);
-
-      expect(notifier.state.todasLasOrdenes.map((o) => o.id), isNot(contains(90)));
     });
   });
 

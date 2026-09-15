@@ -1,6 +1,5 @@
 class TecnicoModel {
   final int id;
-  final int? empresaId;
   final String? authUserId;
   final String nombre;
   final String? apellido;
@@ -11,7 +10,6 @@ class TecnicoModel {
 
   TecnicoModel({
     required this.id,
-    this.empresaId,
     this.authUserId,
     required this.nombre,
     this.apellido,
@@ -39,7 +37,6 @@ class TecnicoModel {
   factory TecnicoModel.fromJson(Map<String, dynamic> json) {
     return TecnicoModel(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id'].toString()) ?? 0,
-      empresaId: json['empresa_id'] as int?,
       authUserId: json['auth_user_id'] as String?,
       nombre: json['nombre'] as String? ?? '',
       apellido: json['apellido'] as String?,
@@ -53,7 +50,6 @@ class TecnicoModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      if (empresaId != null) 'empresa_id': empresaId,
       if (authUserId != null) 'auth_user_id': authUserId,
       'nombre': nombre,
       if (apellido != null) 'apellido': apellido,

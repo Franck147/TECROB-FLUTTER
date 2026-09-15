@@ -55,13 +55,23 @@ final ordenRepositoryProvider = Provider<OrdenRepository>((ref) {
 // ═══════════════════════════════════════════════════════════════════
 
 class AuthState {
+  /// Hay una llamada de inicio de sesión en curso. Sólo afecta al formulario.
   final bool isLoading;
+
+  /// Se está comprobando la sesión guardada al abrir la app.
+  ///
+  /// Va aparte de [isLoading] porque la app sustituye la pantalla entera
+  /// mientras dura. Si lo hiciera también durante el login, destruiría la
+  /// pantalla de acceso a mitad de la llamada y el error nunca llegaría a
+  /// mostrarse: el usuario sólo vería el formulario reaparecer vacío.
+  final bool restaurandoSesion;
   final bool isAuthenticated;
   final TecnicoModel? tecnico;
   final String? errorMessage;
 
   AuthState({
     this.isLoading = false,
+    this.restaurandoSesion = false,
     this.isAuthenticated = false,
     this.tecnico,
     this.errorMessage,
@@ -69,12 +79,14 @@ class AuthState {
 
   AuthState copyWith({
     bool? isLoading,
+    bool? restaurandoSesion,
     bool? isAuthenticated,
     TecnicoModel? tecnico,
     String? errorMessage,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
+      restaurandoSesion: restaurandoSesion ?? this.restaurandoSesion,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       tecnico: tecnico ?? this.tecnico,
       errorMessage: errorMessage,
@@ -92,12 +104,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> checkInitialSession() async {
     final user = _authRepo.currentAuthUser;
     if (user != null) {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(restaurandoSesion: true);
       try {
         final perfil = await _authRepo.obtenerPerfilTecnico(user.id);
         if (perfil != null) {
           state = state.copyWith(
-            isLoading: false,
+            restaurandoSesion: false,
             isAuthenticated: true,
             tecnico: perfil,
           );
@@ -107,7 +119,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('Error al restaurar sesión: $e');
       }
     }
-    state = state.copyWith(isLoading: false, isAuthenticated: false);
+    state = state.copyWith(restaurandoSesion: false, isAuthenticated: false);
   }
 
   Future<bool> login(String email, String password) async {
@@ -242,10 +254,10 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   DashboardNotifier(this._ordenRepo) : super(DashboardState());
 
-  Future<void> cargarDatos(int empresaId) async {
+  Future<void> cargarDatos() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final todas = await _ordenRepo.listarOrdenes(empresaId);
+      final todas = await _ordenRepo.listarOrdenes();
 
       // Cobrado es dinero que ya entró, es decir la suma de los pagos. Antes
       // esto sumaba lo facturado, que cuenta como ingreso una orden que el
@@ -396,10 +408,10 @@ class OrdenesNotifier extends StateNotifier<OrdenesState> {
 
   OrdenesNotifier(this._ordenRepo) : super(OrdenesState());
 
-  Future<void> cargarOrdenes(int empresaId) async {
+  Future<void> cargarOrdenes() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final ordenes = await _ordenRepo.listarOrdenes(empresaId);
+      final ordenes = await _ordenRepo.listarOrdenes();
       state = state.copyWith(
         isLoading: false,
         todasLasOrdenes: ordenes,
@@ -663,10 +675,10 @@ class CatalogoNotifier extends StateNotifier<CatalogoState> {
 
   CatalogoNotifier(this._servicioRepo) : super(CatalogoState());
 
-  Future<void> cargarServicios(int empresaId) async {
+  Future<void> cargarServicios() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final servicios = await _servicioRepo.listarServicios(empresaId);
+      final servicios = await _servicioRepo.listarServicios();
       state = state.copyWith(
         isLoading: false,
         todosLosServicios: servicios,
@@ -712,13 +724,12 @@ class CatalogoNotifier extends StateNotifier<CatalogoState> {
     state = state.copyWith(serviciosFiltrados: lista);
   }
 
-  Future<bool> agregarServicio(int empresaId, Map<String, dynamic> datos) async {
+  Future<bool> agregarServicio(Map<String, dynamic> datos) async {
     state = state.copyWith(isLoading: true);
     try {
-      datos['empresa_id'] = empresaId;
       datos['activo'] = true;
       await _servicioRepo.crearServicio(datos);
-      await cargarServicios(empresaId);
+      await cargarServicios();
       state = state.copyWith(successMessage: 'Servicio agregado exitosamente');
       return true;
     } catch (e) {
@@ -730,11 +741,11 @@ class CatalogoNotifier extends StateNotifier<CatalogoState> {
     }
   }
 
-  Future<bool> actualizarServicio(int id, int empresaId, Map<String, dynamic> datos) async {
+  Future<bool> actualizarServicio(int id, Map<String, dynamic> datos) async {
     state = state.copyWith(isLoading: true);
     try {
       await _servicioRepo.actualizarServicio(id, datos);
-      await cargarServicios(empresaId);
+      await cargarServicios();
       state = state.copyWith(successMessage: 'Servicio actualizado exitosamente');
       return true;
     } catch (e) {
@@ -746,11 +757,11 @@ class CatalogoNotifier extends StateNotifier<CatalogoState> {
     }
   }
 
-  Future<bool> eliminarServicio(int id, int empresaId) async {
+  Future<bool> eliminarServicio(int id) async {
     state = state.copyWith(isLoading: true);
     try {
       await _servicioRepo.eliminarServicio(id);
-      await cargarServicios(empresaId);
+      await cargarServicios();
       state = state.copyWith(successMessage: 'Servicio eliminado correctamente');
       return true;
     } catch (e) {
@@ -805,10 +816,10 @@ class ConfiguracionNotifier extends StateNotifier<ConfiguracionState> {
 
   ConfiguracionNotifier(this._tecnicoRepo) : super(ConfiguracionState());
 
-  Future<void> cargarTecnicos(int empresaId) async {
+  Future<void> cargarTecnicos() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final lista = await _tecnicoRepo.listarTecnicos(empresaId);
+      final lista = await _tecnicoRepo.listarTecnicos();
       state = state.copyWith(isLoading: false, tecnicos: lista);
     } catch (e) {
       state = state.copyWith(
@@ -819,7 +830,6 @@ class ConfiguracionNotifier extends StateNotifier<ConfiguracionState> {
   }
 
   Future<bool> crearTecnico({
-    required int empresaId,
     required String nombre,
     required String apellido,
     required String email,
@@ -840,7 +850,6 @@ class ConfiguracionNotifier extends StateNotifier<ConfiguracionState> {
       }
 
       await _tecnicoRepo.crearTecnico({
-        'empresa_id': empresaId,
         'auth_user_id': authUserId,
         'nombre': nombre,
         'apellido': apellido,
@@ -849,7 +858,7 @@ class ConfiguracionNotifier extends StateNotifier<ConfiguracionState> {
         'activo': true,
       });
 
-      await cargarTecnicos(empresaId);
+      await cargarTecnicos();
       state = state.copyWith(successMessage: 'Técnico creado con éxito.');
       return true;
     } catch (e) {
@@ -861,11 +870,11 @@ class ConfiguracionNotifier extends StateNotifier<ConfiguracionState> {
     }
   }
 
-  Future<bool> desactivarTecnico(int id, int empresaId) async {
+  Future<bool> desactivarTecnico(int id) async {
     state = state.copyWith(isLoading: true);
     try {
       await _tecnicoRepo.desactivarTecnico(id);
-      await cargarTecnicos(empresaId);
+      await cargarTecnicos();
       state = state.copyWith(successMessage: 'Técnico desactivado con éxito.');
       return true;
     } catch (e) {

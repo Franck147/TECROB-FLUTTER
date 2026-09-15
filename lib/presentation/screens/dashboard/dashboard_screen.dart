@@ -32,8 +32,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _cargarDatos() {
     final auth = ref.read(authProvider);
-    if (auth.tecnico?.empresaId != null) {
-      ref.read(dashboardProvider.notifier).cargarDatos(auth.tecnico!.empresaId!);
+    if (auth.tecnico != null) {
+      ref.read(dashboardProvider.notifier).cargarDatos();
     }
   }
 

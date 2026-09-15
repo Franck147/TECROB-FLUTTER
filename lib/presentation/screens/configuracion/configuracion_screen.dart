@@ -25,8 +25,8 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
 
   void _cargarTecnicosSiEsAdmin() {
     final auth = ref.read(authProvider);
-    if (auth.tecnico != null && auth.tecnico!.esAdmin && auth.tecnico!.empresaId != null) {
-      ref.read(configuracionProvider.notifier).cargarTecnicos(auth.tecnico!.empresaId!);
+    if (auth.tecnico != null && auth.tecnico!.esAdmin) {
+      ref.read(configuracionProvider.notifier).cargarTecnicos();
     }
   }
 
@@ -91,10 +91,6 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
   }
 
   void _abrirDialogoNuevoTecnico() {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    if (empresaId == null) return;
-
     showDialog(
       context: context,
       builder: (ctx) => CreateTecnicoDialog(
@@ -106,7 +102,6 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
           required String rol,
         }) async {
           final ok = await ref.read(configuracionProvider.notifier).crearTecnico(
-                empresaId: empresaId,
                 nombre: nombre,
                 apellido: apellido,
                 email: email,
@@ -129,7 +124,6 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
   void _confirmarDesactivarTecnico(int tecnicoId, String nombreTecnico) {
     final auth = ref.read(authProvider);
     final miId = auth.tecnico?.id;
-    final empresaId = auth.tecnico?.empresaId;
 
     if (miId == tecnicoId) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,8 +134,6 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
       );
       return;
     }
-
-    if (empresaId == null) return;
 
     showDialog(
       context: context,
@@ -162,7 +154,7 @@ class _ConfiguracionScreenState extends ConsumerState<ConfiguracionScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await ref.read(configuracionProvider.notifier).desactivarTecnico(tecnicoId, empresaId);
+              await ref.read(configuracionProvider.notifier).desactivarTecnico(tecnicoId);
             },
             child: const Text('Desactivar'),
           ),

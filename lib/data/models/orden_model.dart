@@ -10,7 +10,6 @@ import 'tecnico_model.dart';
 class OrdenModel {
   final int id;
   final String? numeroOrden;
-  final int? empresaId;
   final int? clienteId;
   final int? tecnicoId;
   final String estado;
@@ -40,7 +39,6 @@ class OrdenModel {
   OrdenModel({
     required this.id,
     this.numeroOrden,
-    this.empresaId,
     this.clienteId,
     this.tecnicoId,
     this.estado = 'pendiente',
@@ -202,7 +200,6 @@ class OrdenModel {
     return OrdenModel(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id'].toString()) ?? 0,
       numeroOrden: json['numero_orden'] as String?,
-      empresaId: json['empresa_id'] as int?,
       clienteId: json['cliente_id'] as int?,
       tecnicoId: json['tecnico_id'] as int?,
       estado: json['estado'] as String? ?? 'pendiente',
@@ -236,7 +233,6 @@ class OrdenModel {
     return {
       'id': id,
       if (numeroOrden != null) 'numero_orden': numeroOrden,
-      if (empresaId != null) 'empresa_id': empresaId,
       if (clienteId != null) 'cliente_id': clienteId,
       if (tecnicoId != null) 'tecnico_id': tecnicoId,
       'estado': estado,
@@ -256,7 +252,6 @@ class OrdenModel {
   OrdenModel copyWith({
     int? id,
     String? numeroOrden,
-    int? empresaId,
     int? clienteId,
     int? tecnicoId,
     String? estado,
@@ -280,7 +275,6 @@ class OrdenModel {
     return OrdenModel(
       id: id ?? this.id,
       numeroOrden: numeroOrden ?? this.numeroOrden,
-      empresaId: empresaId ?? this.empresaId,
       clienteId: clienteId ?? this.clienteId,
       tecnicoId: tecnicoId ?? this.tecnicoId,
       estado: estado ?? this.estado,

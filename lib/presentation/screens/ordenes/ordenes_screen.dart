@@ -31,8 +31,8 @@ class _OrdenesScreenState extends ConsumerState<OrdenesScreen> {
 
   void _cargarOrdenes() {
     final auth = ref.read(authProvider);
-    if (auth.tecnico != null && auth.tecnico!.empresaId != null) {
-      ref.read(ordenesProvider.notifier).cargarOrdenes(auth.tecnico!.empresaId!);
+    if (auth.tecnico != null) {
+      ref.read(ordenesProvider.notifier).cargarOrdenes();
     }
   }
 

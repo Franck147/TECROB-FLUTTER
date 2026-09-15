@@ -1,6 +1,5 @@
 class ClienteModel {
   final int id;
-  final int? empresaId;
   final String nombre;
   final String? apellido;
   final String? dni;
@@ -11,7 +10,6 @@ class ClienteModel {
 
   ClienteModel({
     required this.id,
-    this.empresaId,
     required this.nombre,
     this.apellido,
     this.dni,
@@ -40,7 +38,6 @@ class ClienteModel {
   factory ClienteModel.fromJson(Map<String, dynamic> json) {
     return ClienteModel(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id'].toString()) ?? 0,
-      empresaId: json['empresa_id'] as int?,
       nombre: json['nombre'] as String? ?? '',
       apellido: json['apellido'] as String?,
       dni: json['dni'] as String?,
@@ -54,7 +51,6 @@ class ClienteModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      if (empresaId != null) 'empresa_id': empresaId,
       'nombre': nombre,
       if (apellido != null) 'apellido': apellido,
       if (dni != null) 'dni': dni,
@@ -67,7 +63,6 @@ class ClienteModel {
 
   ClienteModel copyWith({
     int? id,
-    int? empresaId,
     String? nombre,
     String? apellido,
     String? dni,
@@ -78,7 +73,6 @@ class ClienteModel {
   }) {
     return ClienteModel(
       id: id ?? this.id,
-      empresaId: empresaId ?? this.empresaId,
       nombre: nombre ?? this.nombre,
       apellido: apellido ?? this.apellido,
       dni: dni ?? this.dni,

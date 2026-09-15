@@ -6,14 +6,10 @@ class ServicioRepository {
 
   ServicioRepository(this._supabase);
 
-  Future<List<ServicioCatalogoModel>> listarServicios(
-    int empresaId, {
+  Future<List<ServicioCatalogoModel>> listarServicios({
     bool soloActivos = true,
   }) async {
-    var query = _supabase
-        .from('servicio_catalogo')
-        .select()
-        .eq('empresa_id', empresaId);
+    var query = _supabase.from('servicio_catalogo').select();
 
     if (soloActivos) {
       query = query.eq('activo', true);
@@ -26,14 +22,10 @@ class ServicioRepository {
         .toList();
   }
 
-  Future<List<ServicioCatalogoModel>> listarPorCategoria(
-    int empresaId,
-    String categoria,
-  ) async {
+  Future<List<ServicioCatalogoModel>> listarPorCategoria(String categoria) async {
     final response = await _supabase
         .from('servicio_catalogo')
         .select()
-        .eq('empresa_id', empresaId)
         .eq('categoria', categoria)
         .eq('activo', true)
         .order('nombre', ascending: true);

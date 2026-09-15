@@ -2,7 +2,6 @@ import '../../core/utils/currency_formatter.dart';
 
 class ServicioCatalogoModel {
   final int id;
-  final int? empresaId;
   final String nombre;
   final String? descripcion;
   final double precioBase;
@@ -15,7 +14,6 @@ class ServicioCatalogoModel {
 
   ServicioCatalogoModel({
     required this.id,
-    this.empresaId,
     required this.nombre,
     this.descripcion,
     required this.precioBase,
@@ -48,7 +46,6 @@ class ServicioCatalogoModel {
   factory ServicioCatalogoModel.fromJson(Map<String, dynamic> json) {
     return ServicioCatalogoModel(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id'].toString()) ?? 0,
-      empresaId: json['empresa_id'] as int?,
       nombre: json['nombre'] as String? ?? '',
       descripcion: json['descripcion'] as String?,
       precioBase: json['precio_base'] != null
@@ -64,7 +61,6 @@ class ServicioCatalogoModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      if (empresaId != null) 'empresa_id': empresaId,
       'nombre': nombre,
       if (descripcion != null) 'descripcion': descripcion,
       'precio_base': precioBase,
@@ -76,7 +72,6 @@ class ServicioCatalogoModel {
 
   ServicioCatalogoModel copyWith({
     int? id,
-    int? empresaId,
     String? nombre,
     String? descripcion,
     double? precioBase,
@@ -87,7 +82,6 @@ class ServicioCatalogoModel {
   }) {
     return ServicioCatalogoModel(
       id: id ?? this.id,
-      empresaId: empresaId ?? this.empresaId,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       precioBase: precioBase ?? this.precioBase,

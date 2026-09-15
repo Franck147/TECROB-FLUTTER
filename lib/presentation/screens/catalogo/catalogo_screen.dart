@@ -38,26 +38,21 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
   }
 
   void _cargarServicios() {
-    final auth = ref.read(authProvider);
-    if (auth.tecnico?.empresaId != null) {
-      ref.read(catalogoProvider.notifier).cargarServicios(auth.tecnico!.empresaId!);
+    if (ref.read(authProvider).tecnico != null) {
+      ref.read(catalogoProvider.notifier).cargarServicios();
     }
   }
 
   void _abrirDialogoServicio([ServicioCatalogoModel? servicio]) {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    if (empresaId == null) return;
-
     showDialog(
       context: context,
       builder: (ctx) => CreateServiceDialog(
         servicioExistente: servicio,
         onSave: (datos) async {
           if (servicio != null) {
-            await ref.read(catalogoProvider.notifier).actualizarServicio(servicio.id, empresaId, datos);
+            await ref.read(catalogoProvider.notifier).actualizarServicio(servicio.id, datos);
           } else {
-            await ref.read(catalogoProvider.notifier).agregarServicio(empresaId, datos);
+            await ref.read(catalogoProvider.notifier).agregarServicio(datos);
           }
         },
       ),
@@ -65,10 +60,6 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
   }
 
   void _confirmarEliminar(ServicioCatalogoModel serv) {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    if (empresaId == null) return;
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -88,7 +79,7 @@ class _CatalogoScreenState extends ConsumerState<CatalogoScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await ref.read(catalogoProvider.notifier).eliminarServicio(serv.id, empresaId);
+              await ref.read(catalogoProvider.notifier).eliminarServicio(serv.id);
             },
             child: const Text('Eliminar'),
           ),

@@ -117,39 +117,48 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       _datos.dniMensaje = null;
     });
 
-    final empresaId = ref.read(authProvider).tecnico?.empresaId;
+    // 1. Cliente ya registrado en la base.
+    try {
+      final existente = await ref.read(clienteRepositoryProvider).buscarClientePorDni(dni);
 
-    // 1. Cliente ya registrado en la base de la empresa.
-    if (empresaId != null) {
-      try {
-        final existente =
-            await ref.read(clienteRepositoryProvider).buscarClientePorDni(empresaId, dni);
-
-        if (existente != null) {
-          if (!mounted) return;
-          setState(() {
-            _datos.buscandoDni = false;
-            _datos.clienteSeleccionado = existente;
-            _datos.nombre.text = existente.nombre;
-            _datos.apellido.text = existente.apellido ?? '';
-            if (existente.telefono != null && existente.telefono!.isNotEmpty) {
-              _datos.telefono.text = existente.telefono!;
-            }
-            if (existente.email != null && existente.email!.isNotEmpty) {
-              _datos.email.text = existente.email!;
-            }
-            _datos.dniMensajeEsExito = true;
-            _datos.dniMensaje = 'Cliente ya registrado: ${existente.nombreCompleto}';
-          });
-          return;
-        }
-      } catch (e) {
-        debugPrint('Aviso: error buscando cliente en la base local: $e');
+      if (existente != null) {
+        if (!mounted) return;
+        setState(() {
+          _datos.buscandoDni = false;
+          _datos.clienteSeleccionado = existente;
+          _datos.nombre.text = existente.nombre;
+          _datos.apellido.text = existente.apellido ?? '';
+          if (existente.telefono != null && existente.telefono!.isNotEmpty) {
+            _datos.telefono.text = existente.telefono!;
+          }
+          if (existente.email != null && existente.email!.isNotEmpty) {
+            _datos.email.text = existente.email!;
+          }
+          _datos.dniMensajeEsExito = true;
+          _datos.dniMensaje = 'Cliente ya registrado: ${existente.nombreCompleto}';
+        });
+        return;
       }
+    } catch (e) {
+      debugPrint('Aviso: error buscando cliente en la base local: $e');
     }
 
-    // 2. Consulta a RENIEC a través de ApisPeru.
-    final datosDni = await ref.read(dniServiceProvider).consultarDni(dni);
+    // 2. Consulta a RENIEC a través de ApisPeru. Sin token no hay consulta, y
+    //    decir "no encontrado" haría creer que el DNI no existe.
+    final servicioDni = ref.read(dniServiceProvider);
+    if (!servicioDni.disponible) {
+      if (!mounted) return;
+      setState(() {
+        _datos.buscandoDni = false;
+        _datos.clienteSeleccionado = null;
+        _datos.dniMensajeEsExito = false;
+        _datos.dniMensaje = 'La búsqueda en RENIEC está desactivada porque falta '
+            'el token de ApisPeru. Escribe los datos a mano.';
+      });
+      return;
+    }
+
+    final datosDni = await servicioDni.consultarDni(dni);
     if (!mounted) return;
 
     setState(() {
@@ -261,15 +270,11 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   }
 
   void _crearServicioEnCaliente() {
-    final empresaId = ref.read(authProvider).tecnico?.empresaId;
-    if (empresaId == null) return;
-
     showDialog<void>(
       context: context,
       builder: (ctx) => CreateServiceDialog(
         onSave: (nuevo) async {
-          final creado =
-              await ref.read(catalogoProvider.notifier).agregarServicio(empresaId, nuevo);
+          final creado = await ref.read(catalogoProvider.notifier).agregarServicio(nuevo);
           if (creado && mounted) _abrirSelectorServicios();
         },
       ),
@@ -298,12 +303,10 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   }
 
   Future<void> _guardarOrden() async {
-    final auth = ref.read(authProvider);
-    final empresaId = auth.tecnico?.empresaId;
-    final tecnicoId = auth.tecnico?.id;
+    final tecnicoId = ref.read(authProvider).tecnico?.id;
 
-    if (empresaId == null || tecnicoId == null) {
-      _avisar('Tu sesión no tiene una empresa asignada', esError: true);
+    if (tecnicoId == null) {
+      _avisar('Tu sesión no tiene un técnico asignado', esError: true);
       return;
     }
 
@@ -311,7 +314,6 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
     try {
       final datosOrden = <String, dynamic>{
-        'empresa_id': empresaId,
         'tecnico_id': tecnicoId,
         'estado': 'pendiente',
         'prioridad': _datos.prioridad,
@@ -336,7 +338,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
       };
 
       final orden = await ref.read(ordenRepositoryProvider).crearOrdenCompleta(
-            datosCliente: _datosCliente(empresaId),
+            datosCliente: _datosCliente(),
             datosOrden: datosOrden,
             datosEquipo: datosEquipo,
             servicios: _datos.servicios,
@@ -360,7 +362,7 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
   /// Si lleva id, la función actualiza ese cliente; si no, lo crea. Va en la
   /// misma llamada que la orden a propósito: guardarlo antes por separado
   /// dejaba el cliente escrito aunque la orden fallara después.
-  Map<String, dynamic> _datosCliente(int empresaId) {
+  Map<String, dynamic> _datosCliente() {
     final apellido = _datos.apellido.text.trim();
     final telefono = _datos.telefono.text.trim();
     final email = _datos.email.text.trim();
@@ -369,7 +371,6 @@ class _NuevaOrdenScreenState extends ConsumerState<NuevaOrdenScreen> {
 
     return {
       if (existente != null) 'id': existente.id,
-      'empresa_id': empresaId,
       'nombre': _datos.nombre.text.trim(),
       if (apellido.isNotEmpty) 'apellido': apellido,
       if (dni.isNotEmpty) 'dni': dni,

@@ -6,21 +6,19 @@ class ClienteRepository {
 
   ClienteRepository(this._supabase);
 
-  Future<List<ClienteModel>> listarClientes(int empresaId) async {
+  Future<List<ClienteModel>> listarClientes() async {
     final response = await _supabase
         .from('cliente')
         .select()
-        .eq('empresa_id', empresaId)
         .order('nombre', ascending: true);
 
     return (response as List).map((json) => ClienteModel.fromJson(json)).toList();
   }
 
-  Future<ClienteModel?> buscarClientePorDni(int empresaId, String dni) async {
+  Future<ClienteModel?> buscarClientePorDni(String dni) async {
     final response = await _supabase
         .from('cliente')
         .select()
-        .eq('empresa_id', empresaId)
         .eq('dni', dni)
         .maybeSingle();
 
@@ -30,11 +28,10 @@ class ClienteRepository {
     return null;
   }
 
-  Future<List<ClienteModel>> buscarClientes(int empresaId, String query) async {
+  Future<List<ClienteModel>> buscarClientes(String query) async {
     final response = await _supabase
         .from('cliente')
         .select()
-        .eq('empresa_id', empresaId)
         .or('nombre.ilike.%$query%,apellido.ilike.%$query%,dni.ilike.%$query%,telefono.ilike.%$query%')
         .order('nombre', ascending: true);
 

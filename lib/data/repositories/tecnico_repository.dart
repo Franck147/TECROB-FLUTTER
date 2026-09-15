@@ -6,11 +6,10 @@ class TecnicoRepository {
 
   TecnicoRepository(this._supabase);
 
-  Future<List<TecnicoModel>> listarTecnicos(int empresaId) async {
+  Future<List<TecnicoModel>> listarTecnicos() async {
     final response = await _supabase
         .from('tecnico')
         .select()
-        .eq('empresa_id', empresaId)
         .eq('activo', true)
         .order('nombre', ascending: true);
 

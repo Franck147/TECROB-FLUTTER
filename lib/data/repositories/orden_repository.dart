@@ -18,15 +18,11 @@ class OrdenRepository {
     historial_estado (*)
   ''';
 
-  Future<List<OrdenModel>> listarOrdenes(
-    int empresaId, {
+  Future<List<OrdenModel>> listarOrdenes({
     String? estado,
     int? limit,
   }) async {
-    var query = _supabase
-        .from('orden')
-        .select(_selectQueryCompleta)
-        .eq('empresa_id', empresaId);
+    var query = _supabase.from('orden').select(_selectQueryCompleta);
 
     if (estado != null && estado.isNotEmpty) {
       query = query.eq('estado', estado);

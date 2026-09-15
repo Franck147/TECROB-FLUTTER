@@ -59,7 +59,7 @@ class TecrobSysApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      home: authState.isLoading
+      home: authState.restaurandoSesion
           ? Scaffold(
               backgroundColor: themeMode == ThemeMode.dark
                   ? AppColors.darkFondoPrincipal
