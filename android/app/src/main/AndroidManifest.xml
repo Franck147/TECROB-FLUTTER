@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Supabase y la consulta de DNI necesitan red. Flutter sólo lo agrega
+         por su cuenta en debug, así que sin esta línea el APK release no
+         conecta. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="tecrobsys"
         android:name="${applicationName}"
@@ -40,6 +45,17 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Desde Android 11, canLaunchUrl responde falso para lo que no se
+             declare aquí: los enlaces wa.me de WhatsApp y las llamadas. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tel"/>
         </intent>
     </queries>
 </manifest>
