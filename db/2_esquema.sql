@@ -9,7 +9,15 @@
 --
 -- Pensado para ejecutarse entero sobre una base vacía, en el editor SQL de
 -- Supabase. Es idempotente en lo que puede serlo: las tablas usan IF NOT
--- EXISTS y las funciones y políticas se reemplazan.
+-- EXISTS y las funciones y políticas se reemplazan. Por eso mismo no sirve
+-- sobre una base con las tablas viejas: las dejaría como están.
+--
+-- Para rehacer la base desde cero, cada archivo entero y en este orden:
+--   1. db/1_borrar_todo.sql       borra lo que haya, incluida la versión
+--                                 vieja con empresa_id
+--   2. db/2_esquema.sql           este archivo
+--   3. db/3_tecnicos.sql          da acceso a tus usuarios
+--   4. db/4_datos_de_prueba.sql   opcional, un taller ficticio para probar
 --
 -- ── Idea de fondo ──────────────────────────────────────────────────────────
 --
@@ -21,68 +29,16 @@
 --
 -- El adelanto ya no es una columna. Entra como el primer pago, que es lo que
 -- realmente es. Antes vivía en dos sitios y las pantallas leían el equivocado.
-
--- ───────────────────────────────────────────────────────────────────────────
--- 0. BORRADO PREVIO · DESTRUYE TODOS LOS DATOS
 --
--- Descomenta este bloque SÓLO si quieres partir de cero. Borra las nueve
--- tablas con todo su contenido y no hay vuelta atrás.
---
--- Lo que NO se toca: los usuarios de acceso, que viven en el esquema auth. Tu
--- correo y tu contraseña siguen funcionando, y el proyecto conserva su URL y
--- sus claves. Lo único que hay que rehacer después es la fila de tu técnico,
--- que es lo que ata tu usuario a una empresa.
---
--- El cascade se lleva por delante los disparadores, las políticas y los
--- índices de esas tablas. Las funciones sueltas hay que borrarlas aparte,
--- incluida la versión antigua de crear_orden_completa, que tenía tres
--- parámetros en lugar de cuatro y quedaría conviviendo con la nueva.
--- ───────────────────────────────────────────────────────────────────────────
-
--- drop table if exists public.historial_estado  cascade;
--- drop table if exists public.pago              cascade;
--- drop table if exists public.orden_servicio    cascade;
--- drop table if exists public.equipo            cascade;
--- drop table if exists public.orden             cascade;
--- drop table if exists public.servicio_catalogo cascade;
--- drop table if exists public.cliente           cascade;
--- drop table if exists public.tecnico           cascade;
--- drop table if exists public.empresa           cascade;
---
--- drop function if exists public.crear_orden_completa(jsonb, jsonb, jsonb) cascade;
---
--- -- Cualquier otra función suelta que quedara del esquema anterior.
--- do $limpieza$
--- declare
---   f record;
--- begin
---   for f in
---     select p.oid::regprocedure as firma
---       from pg_proc p
---      where p.pronamespace = 'public'::regnamespace
---        and p.prokind = 'f'
---   loop
---     execute format('drop function if exists %s cascade', f.firma);
---   end loop;
--- end $limpieza$;
+-- Hay un solo taller, así que ninguna tabla lleva empresa_id. Quien tiene una
+-- fila activa en tecnico ve todo; quien no la tiene no ve nada.
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 1. TABLAS
 -- ───────────────────────────────────────────────────────────────────────────
 
-create table if not exists public.empresa (
-  id          integer generated always as identity primary key,
-  nombre      text not null,
-  ruc         text,
-  telefono    text,
-  email       text,
-  direccion   text,
-  created_at  timestamptz not null default now()
-);
-
 create table if not exists public.tecnico (
   id            integer generated always as identity primary key,
-  empresa_id    integer not null references public.empresa(id) on delete restrict,
   auth_user_id  uuid unique,
   nombre        text not null,
   apellido      text,
@@ -95,7 +51,6 @@ create table if not exists public.tecnico (
 
 create table if not exists public.cliente (
   id          integer generated always as identity primary key,
-  empresa_id  integer not null references public.empresa(id) on delete restrict,
   nombre      text not null,
   apellido    text,
   telefono    text not null,
@@ -107,7 +62,6 @@ create table if not exists public.cliente (
 
 create table if not exists public.servicio_catalogo (
   id           integer generated always as identity primary key,
-  empresa_id   integer not null references public.empresa(id) on delete restrict,
   nombre       text not null,
   descripcion  text,
   precio_base  numeric(10,2) not null default 0 check (precio_base >= 0),
@@ -124,7 +78,6 @@ create table if not exists public.servicio_catalogo (
 create table if not exists public.orden (
   id                integer generated always as identity primary key,
   numero_orden      text,
-  empresa_id        integer not null references public.empresa(id) on delete restrict,
   cliente_id        integer not null references public.cliente(id) on delete restrict,
   tecnico_id        integer not null references public.tecnico(id) on delete restrict,
   estado            text not null default 'pendiente'
@@ -141,11 +94,7 @@ create table if not exists public.orden (
   fecha_prometida   date,
   observaciones     text,
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
-
-  -- El número es único dentro de la empresa, no en toda la base: dos talleres
-  -- distintos pueden tener cada uno su ORD-0001.
-  constraint orden_numero_por_empresa unique (empresa_id, numero_orden)
+  updated_at        timestamptz not null default now()
 );
 
 create table if not exists public.equipo (
@@ -196,13 +145,10 @@ create table if not exists public.historial_estado (
 -- 2. ÍNDICES
 --
 -- Postgres no indexa las claves foráneas por su cuenta, y la app pide todas
--- las órdenes de una empresa con sus relaciones en cada carga del panel.
+-- las órdenes con sus relaciones en cada carga del panel.
 -- ───────────────────────────────────────────────────────────────────────────
 
-create index if not exists idx_tecnico_empresa           on public.tecnico(empresa_id);
-create index if not exists idx_cliente_empresa           on public.cliente(empresa_id);
-create index if not exists idx_servicio_empresa          on public.servicio_catalogo(empresa_id);
-create index if not exists idx_orden_empresa_estado      on public.orden(empresa_id, estado);
+create index if not exists idx_orden_estado              on public.orden(estado);
 create index if not exists idx_orden_cliente             on public.orden(cliente_id);
 create index if not exists idx_orden_tecnico             on public.orden(tecnico_id);
 create index if not exists idx_orden_fecha_prometida     on public.orden(fecha_prometida);
@@ -211,22 +157,29 @@ create index if not exists idx_orden_servicio_servicio   on public.orden_servici
 create index if not exists idx_pago_orden                on public.pago(orden_id);
 create index if not exists idx_historial_orden           on public.historial_estado(orden_id);
 
--- Un mismo documento o un mismo teléfono no pueden repetirse dentro de una
--- empresa. Sin esto, el asistente de nueva orden crea clientes duplicados.
+-- El número de orden no se repite. Va como índice y no dentro de la tabla para
+-- que también llegue a las bases donde la tabla ya existía.
+create unique index if not exists idx_orden_numero_unico
+  on public.orden(numero_orden);
+
+-- Un mismo documento o un mismo teléfono no pueden repetirse. Sin esto, el
+-- asistente de nueva orden crea clientes duplicados. El relleno 'sin telefono'
+-- que pone crear_orden_completa queda fuera: si no, el segundo cliente sin
+-- celular chocaría con el primero y su orden no se guardaría.
 create unique index if not exists idx_cliente_dni_unico
-  on public.cliente(empresa_id, dni)
+  on public.cliente(dni)
   where dni is not null and dni <> '';
 
 create unique index if not exists idx_cliente_telefono_unico
-  on public.cliente(empresa_id, telefono)
-  where telefono <> '';
+  on public.cliente(telefono)
+  where telefono <> '' and telefono <> 'sin telefono';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 3. NUMERACIÓN DE ÓRDENES
 --
--- Correlativo por empresa con el formato ORD-0001. Si dos órdenes se crean en
--- el mismo instante, la restricción única de arriba hace que una falle y se
--- reintente, que es preferible a repetir un número.
+-- Correlativo con el formato ORD-0001. Si dos órdenes se crean en el mismo
+-- instante, el índice único de arriba hace que una falle y se reintente, que
+-- es preferible a repetir un número.
 -- ───────────────────────────────────────────────────────────────────────────
 
 create or replace function public.asignar_numero_orden()
@@ -237,8 +190,7 @@ begin
   if new.numero_orden is null or new.numero_orden = '' then
     select coalesce(max(nullif(regexp_replace(numero_orden, '\D', '', 'g'), '')::integer), 0) + 1
       into v_siguiente
-      from orden
-     where empresa_id = new.empresa_id;
+      from orden;
 
     new.numero_orden := 'ORD-' || lpad(v_siguiente::text, 4, '0');
   end if;
@@ -395,29 +347,29 @@ create trigger trg_orden_historial
 -- ───────────────────────────────────────────────────────────────────────────
 -- 7. SEGURIDAD POR FILA
 --
--- Cada técnico ve y toca sólo lo de su empresa. La función va como SECURITY
--- DEFINER a propósito: si consultara la tabla tecnico con RLS activa, la
--- política de tecnico se llamaría a sí misma.
+-- Sólo entra quien tiene una fila activa en tecnico, y dentro todos ven lo
+-- mismo. La función va como SECURITY DEFINER a propósito: si consultara la
+-- tabla tecnico con RLS activa, la política de tecnico se llamaría a sí misma.
 -- ───────────────────────────────────────────────────────────────────────────
 
 -- Nota de arranque: en una base recién creada no hay ningún técnico, así que
--- empresa_actual() devuelve null y la app no ve nada. La primera empresa y el
--- primer técnico se crean desde el editor SQL de Supabase, que no pasa por
--- estas políticas. Para eso está db/datos_de_prueba.sql.
+-- nadie pasa estas políticas y la app no ve nada. El primer técnico se crea
+-- desde el editor SQL de Supabase, que no pasa por ellas. Para eso está
+-- db/3_tecnicos.sql.
 
-create or replace function public.empresa_actual()
-returns integer language sql stable security definer set search_path = public as $$
-  select empresa_id
-    from tecnico
-   where auth_user_id = auth.uid()
-     and activo
-   limit 1
+create or replace function public.es_tecnico_activo()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1
+      from tecnico
+     where auth_user_id = auth.uid()
+       and activo
+  )
 $$;
 
-revoke execute on function public.empresa_actual() from public;
-grant execute on function public.empresa_actual() to authenticated;
+revoke execute on function public.es_tecnico_activo() from public;
+grant execute on function public.es_tecnico_activo() to authenticated;
 
-alter table public.empresa           enable row level security;
 alter table public.tecnico           enable row level security;
 alter table public.cliente           enable row level security;
 alter table public.servicio_catalogo enable row level security;
@@ -427,46 +379,18 @@ alter table public.orden_servicio    enable row level security;
 alter table public.pago              enable row level security;
 alter table public.historial_estado  enable row level security;
 
--- La empresa propia sólo se lee.
-drop policy if exists empresa_propia on public.empresa;
-create policy empresa_propia on public.empresa
-  for select to authenticated
-  using (id = public.empresa_actual());
-
--- El resto de tablas con empresa_id siguen el mismo patrón.
 do $$
 declare
   t text;
 begin
-  foreach t in array array['tecnico', 'cliente', 'servicio_catalogo', 'orden'] loop
-    execute format('drop policy if exists %1$s_de_mi_empresa on public.%1$I', t);
+  foreach t in array array['tecnico', 'cliente', 'servicio_catalogo', 'orden',
+                           'equipo', 'orden_servicio', 'pago', 'historial_estado'] loop
+    execute format('drop policy if exists %1$s_de_tecnicos on public.%1$I', t);
     execute format($f$
-      create policy %1$s_de_mi_empresa on public.%1$I
+      create policy %1$s_de_tecnicos on public.%1$I
         for all to authenticated
-        using (empresa_id = public.empresa_actual())
-        with check (empresa_id = public.empresa_actual())
-    $f$, t);
-  end loop;
-end $$;
-
--- Las tablas hijas heredan la empresa a través de su orden.
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['equipo', 'orden_servicio', 'pago', 'historial_estado'] loop
-    execute format('drop policy if exists %1$s_de_mi_empresa on public.%1$I', t);
-    execute format($f$
-      create policy %1$s_de_mi_empresa on public.%1$I
-        for all to authenticated
-        using (exists (
-          select 1 from public.orden o
-           where o.id = %1$I.orden_id
-             and o.empresa_id = public.empresa_actual()))
-        with check (exists (
-          select 1 from public.orden o
-           where o.id = %1$I.orden_id
-             and o.empresa_id = public.empresa_actual()))
+        using (public.es_tecnico_activo())
+        with check (public.es_tecnico_activo())
     $f$, t);
   end loop;
 end $$;
@@ -494,7 +418,6 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_empresa_id integer := (p_orden->>'empresa_id')::integer;
   v_cliente_id integer := nullif(p_cliente->>'id', '')::integer;
   v_orden_id   integer;
   v_adelanto   numeric(10,2) := coalesce((p_orden->>'adelanto')::numeric, 0);
@@ -505,9 +428,8 @@ begin
 
   -- 1. El cliente: se actualiza si ya existía, se crea si no.
   if v_cliente_id is null then
-    insert into cliente (empresa_id, nombre, apellido, dni, telefono, email)
+    insert into cliente (nombre, apellido, dni, telefono, email)
     values (
-      v_empresa_id,
       p_cliente->>'nombre',
       p_cliente->>'apellido',
       nullif(p_cliente->>'dni', ''),
@@ -527,11 +449,10 @@ begin
 
   -- 2. La orden. Los importes los pone el disparador, no lo que mande la app.
   insert into orden (
-    empresa_id, cliente_id, tecnico_id, estado, prioridad,
+    cliente_id, tecnico_id, estado, prioridad,
     descuento, contrasena_equipo, fecha_prometida, observaciones
   )
   values (
-    v_empresa_id,
     v_cliente_id,
     (p_orden->>'tecnico_id')::integer,
     coalesce(p_orden->>'estado', 'pendiente'),
@@ -586,3 +507,27 @@ end $$;
 
 revoke execute on function public.crear_orden_completa(jsonb, jsonb, jsonb, jsonb) from public;
 grant execute on function public.crear_orden_completa(jsonb, jsonb, jsonb, jsonb) to authenticated;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 9. PERMISOS DE LA API
+--
+-- Las políticas de arriba deciden qué filas ve cada técnico, pero antes de
+-- mirarlas Postgres exige que el rol tenga permiso sobre la tabla. Los
+-- proyectos de Supabase recientes ya no se lo dan solo a las tablas creadas
+-- por SQL. Sin estas líneas, toda lectura desde la app falla con
+-- "permission denied for table", empezando por la del perfil del técnico
+-- justo después de iniciar sesión.
+--
+-- Sólo a authenticated: sin sesión no hay nada que leer.
+-- ───────────────────────────────────────────────────────────────────────────
+
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+
+-- La API guarda en caché qué tablas existen. Tras rehacer el esquema hay que
+-- avisarla, o seguirá respondiendo que las tablas nuevas no existen.
+notify pgrst, 'reload schema';

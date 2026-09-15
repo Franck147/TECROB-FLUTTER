@@ -41,9 +41,8 @@ from orden;
 -- ─────────────────────────────────────────────────────────────────────
 -- 3. ¿Quién genera numero_orden?
 --
--- La función crear_orden_completa no lo escribe, pero la app muestra códigos
--- tipo ORD-0035. Si aquí sale null en todas las filas recientes, el código
--- visible es sólo el id.
+-- Lo pone el disparador trg_orden_numero con el formato ORD-0001. Si aquí
+-- sale null en las filas recientes, el disparador no está instalado.
 -- ─────────────────────────────────────────────────────────────────────
 select id, numero_orden, created_at
 from orden
@@ -64,7 +63,6 @@ with calculado as (
     o.subtotal,
     o.descuento,
     o.total,
-    o.adelanto,
     o.saldo_pendiente,
     coalesce((select sum(os.precio_unitario * os.cantidad)
               from orden_servicio os where os.orden_id = o.id), 0) as subtotal_real,
@@ -74,8 +72,7 @@ with calculado as (
 )
 select *,
        subtotal - subtotal_real                       as desfase_subtotal,
-       saldo_pendiente - (total - pagado_real)        as desfase_saldo,
-       adelanto - pagado_real                         as desfase_adelanto
+       saldo_pendiente - (total - pagado_real)        as desfase_saldo
 from calculado
 where subtotal <> subtotal_real
    or saldo_pendiente <> (total - pagado_real)
@@ -85,7 +82,7 @@ order by id;
 -- ─────────────────────────────────────────────────────────────────────
 -- 5. ¿Hay saldos negativos? Son cobros por encima de lo debido.
 -- ─────────────────────────────────────────────────────────────────────
-select id, numero_orden, estado, total, adelanto, saldo_pendiente
+select id, numero_orden, estado, total, saldo_pendiente
 from orden
 where saldo_pendiente < 0
 order by saldo_pendiente;
@@ -93,8 +90,8 @@ order by saldo_pendiente;
 -- ─────────────────────────────────────────────────────────────────────
 -- 6. ¿Se está usando historial_estado?
 --
--- La app no escribe en esta tabla. Si sale 0, la tabla está muerta: o se
--- empieza a llenar desde la app, o se elimina.
+-- La llena el disparador trg_orden_historial en cada cambio de estado. Si
+-- sale 0 habiendo órdenes, el disparador no está instalado.
 -- ─────────────────────────────────────────────────────────────────────
 select count(*) as filas_de_historial from historial_estado;
 
@@ -103,26 +100,25 @@ select count(*) as filas_de_historial from historial_estado;
 -- ─────────────────────────────────────────────────────────────────────
 select
   count(*) filter (where observaciones is not null and observaciones <> '') as con_observaciones,
-  count(*) filter (where pdf_url is not null and pdf_url <> '')             as con_pdf_url,
   count(*) filter (where contrasena_equipo is not null)                     as con_contrasena
 from orden;
 
 -- ─────────────────────────────────────────────────────────────────────
 -- 8. ¿Hay clientes duplicados?
 --
--- No existe restricción única por DNI ni por teléfono dentro de una empresa,
--- así que el asistente de nueva orden puede crear el mismo cliente dos veces.
+-- El esquema los impide con índices únicos. Si sale algo aquí, la base se
+-- creó antes de esos índices.
 -- ─────────────────────────────────────────────────────────────────────
-select empresa_id, dni, count(*) as veces
+select dni, count(*) as veces
 from cliente
 where dni is not null and dni <> ''
-group by empresa_id, dni
+group by dni
 having count(*) > 1
 order by veces desc;
 
-select empresa_id, telefono, count(*) as veces
+select telefono, count(*) as veces
 from cliente
-group by empresa_id, telefono
+group by telefono
 having count(*) > 1
 order by veces desc;
 
@@ -160,8 +156,8 @@ order by tablename, policyname;
 -- ─────────────────────────────────────────────────────────────────────
 -- 11. ¿Están indexadas las columnas por las que la app filtra siempre?
 --
--- La app pide todas las órdenes de una empresa con sus relaciones en cada
--- carga del panel y del listado.
+-- La app pide todas las órdenes con sus relaciones en cada carga del panel
+-- y del listado.
 -- ─────────────────────────────────────────────────────────────────────
 select tablename, indexname, indexdef
 from pg_indexes

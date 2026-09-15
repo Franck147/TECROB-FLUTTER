@@ -1,15 +1,14 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  TecrobSys · Taller ficticio para probar la app
+--  TecrobSys · Paso 4 (opcional) · Taller ficticio para probar la app
 -- ═══════════════════════════════════════════════════════════════════════════
 --
--- Crea una empresa, un catálogo de servicios, seis clientes y ocho órdenes,
--- una en cada punto del recorrido: recién ingresada, en diagnóstico, en
--- reparación, lista y pagada, lista y por cobrar, entregada, cancelada y sin
--- reparación posible. Sirve para recorrer la app entera sin inventar datos a
--- mano.
+-- Crea un catálogo de servicios, seis clientes y ocho órdenes, una en cada
+-- punto del recorrido: recién ingresada, en diagnóstico, en reparación, lista
+-- y pagada, lista y por cobrar, entregada, cancelada y sin reparación posible.
+-- Sirve para recorrer la app entera sin inventar datos a mano.
 --
--- Requisitos: ejecutar antes db/esquema.sql, y tener ya creado en Supabase el
--- usuario de autenticación con el que vas a entrar.
+-- Requisitos: ejecutar antes db/2_esquema.sql y db/3_tecnicos.sql. Las
+-- órdenes quedan a nombre del primer administrador activo.
 --
 -- Ejecutar en el editor SQL de Supabase, que corre sin las políticas de fila.
 --
@@ -17,11 +16,6 @@
 
 do $$
 declare
-  -- ── Cambia esto por el correo de tu usuario de Supabase ──────────────────
-  v_email_tecnico text := 'tecrobsys@gmail.com';
-
-  v_auth_id    uuid;
-  v_empresa_id integer;
   v_tecnico_id integer;
   v_orden_id   integer;
 
@@ -32,52 +26,45 @@ declare
 
   v_cli   integer[];
 begin
-  select id into v_auth_id from auth.users where email = v_email_tecnico;
-  if v_auth_id is null then
-    raise exception
-      'No existe el usuario % en auth.users. Créalo primero en Supabase.',
-      v_email_tecnico;
+  -- 1. Técnico ──────────────────────────────────────────────────────────────
+  --
+  -- No se crea aquí: lo pone db/3_tecnicos.sql, ligado a tu usuario real.
+  select id into v_tecnico_id
+    from tecnico
+   where activo
+   order by (rol = 'administrador') desc, id
+   limit 1;
+
+  if v_tecnico_id is null then
+    raise exception 'No hay ningún técnico activo. Ejecuta antes db/3_tecnicos.sql.';
   end if;
 
-  -- 1. Empresa y técnico ────────────────────────────────────────────────────
-  insert into empresa (nombre, ruc, telefono, email, direccion)
-  values ('MULTISERVICIOS TECROB SYS E.I.R.L.', '20600000001', '999888777',
-          v_email_tecnico, 'Av. Siempre Viva 742')
-  returning id into v_empresa_id;
-
-  insert into tecnico (empresa_id, auth_user_id, nombre, apellido, email, rol)
-  values (v_empresa_id, v_auth_id, 'Adler', 'Bautista', v_email_tecnico, 'administrador')
-  returning id into v_tecnico_id;
-
   -- 2. Catálogo de servicios ────────────────────────────────────────────────
-  insert into servicio_catalogo (empresa_id, nombre, precio_base, categoria) values
-    (v_empresa_id, 'Diagnóstico general',        30,  'diagnostico'),
-    (v_empresa_id, 'Mantenimiento preventivo',   80,  'mantenimiento'),
-    (v_empresa_id, 'Instalación de sistema',     70,  'software'),
-    (v_empresa_id, 'Cambio de pantalla',        250,  'reparacion'),
-    (v_empresa_id, 'Cambio de teclado',         120,  'repuesto'),
-    (v_empresa_id, 'Limpieza de cabezales',      60,  'mantenimiento');
+  insert into servicio_catalogo (nombre, precio_base, categoria) values
+    ('Diagnóstico general',        30,  'diagnostico'),
+    ('Mantenimiento preventivo',   80,  'mantenimiento'),
+    ('Instalación de sistema',     70,  'software'),
+    ('Cambio de pantalla',        250,  'reparacion'),
+    ('Cambio de teclado',         120,  'repuesto'),
+    ('Limpieza de cabezales',      60,  'mantenimiento');
 
-  select id into v_diag from servicio_catalogo
-   where empresa_id = v_empresa_id and nombre = 'Diagnóstico general';
-  select id into v_mant from servicio_catalogo
-   where empresa_id = v_empresa_id and nombre = 'Mantenimiento preventivo';
-  select id into v_soft from servicio_catalogo
-   where empresa_id = v_empresa_id and nombre = 'Instalación de sistema';
-  select id into v_rep  from servicio_catalogo
-   where empresa_id = v_empresa_id and nombre = 'Cambio de pantalla';
+  select id into v_diag from servicio_catalogo where nombre = 'Diagnóstico general';
+  select id into v_mant from servicio_catalogo where nombre = 'Mantenimiento preventivo';
+  select id into v_soft from servicio_catalogo where nombre = 'Instalación de sistema';
+  select id into v_rep  from servicio_catalogo where nombre = 'Cambio de pantalla';
 
   -- 3. Clientes ─────────────────────────────────────────────────────────────
-  insert into cliente (empresa_id, nombre, apellido, telefono, dni) values
-    (v_empresa_id, 'Javier',   'Curo Huarcaya',   '987111222', '41258963'),
-    (v_empresa_id, 'Fredy',    'Bautista',        '987222333', '45896321'),
-    (v_empresa_id, 'Gina',     'Pullo Quispe',    '987333444', '70125896'),
-    (v_empresa_id, 'Jhonatan', 'Sauñe Pichardo',  '987444555', '72589631'),
-    (v_empresa_id, 'Cristian', 'Adco',            '987555666', '75896321'),
-    (v_empresa_id, 'Eduardo',  'Ramos',           '987666777', '48521963');
+  insert into cliente (nombre, apellido, telefono, dni) values
+    ('Javier',   'Curo Huarcaya',   '987111222', '41258963'),
+    ('Fredy',    'Bautista',        '987222333', '45896321'),
+    ('Gina',     'Pullo Quispe',    '987333444', '70125896'),
+    ('Jhonatan', 'Sauñe Pichardo',  '987444555', '72589631'),
+    ('Cristian', 'Adco',            '987555666', '75896321'),
+    ('Eduardo',  'Ramos',           '987666777', '48521963');
 
   select array_agg(id order by id) into v_cli
-    from cliente where empresa_id = v_empresa_id;
+    from cliente
+   where dni in ('41258963', '45896321', '70125896', '72589631', '75896321', '48521963');
 
   -- 4. Las ocho órdenes ─────────────────────────────────────────────────────
   --
@@ -87,7 +74,7 @@ begin
   -- 4.1 Recién ingresada, con plazo por delante.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[1]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'prioridad', 'normal',
                        'fecha_prometida', (current_date + 3)::text),
     jsonb_build_object('tipo', 'laptop', 'marca', 'HP', 'modelo', '250 G7',
@@ -99,7 +86,7 @@ begin
   -- 4.2 En diagnóstico, con adelanto y ya fuera de plazo.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[2]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'prioridad', 'alta', 'adelanto', 50,
                        'metodo_adelanto', 'yape',
                        'fecha_prometida', (current_date - 3)::text),
@@ -113,7 +100,7 @@ begin
   -- 4.3 En reparación, con descuento aplicado después.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[3]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'prioridad', 'urgente', 'adelanto', 100,
                        'fecha_prometida', (current_date + 1)::text),
     jsonb_build_object('tipo', 'impresora', 'marca', 'Epson', 'modelo', 'L3250',
@@ -127,7 +114,7 @@ begin
   -- 4.4 Lista y pagada del todo, esperando desde hace días.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[4]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'adelanto', 150, 'metodo_adelanto', 'efectivo'),
     jsonb_build_object('tipo', 'laptop', 'marca', 'Lenovo', 'modelo', 'ThinkPad',
                        'desperfecto', 'Cambio de teclado'),
@@ -144,7 +131,7 @@ begin
   -- 4.5 Lista pero sin pagar: hay que cobrar al entregar.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[5]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'fecha_prometida', (current_date - 1)::text),
     jsonb_build_object('tipo', 'celular', 'marca', 'Samsung', 'modelo', 'A54',
                        'desperfecto', 'Pantalla rota'),
@@ -156,7 +143,7 @@ begin
   -- 4.6 Entregada y cobrada.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[6]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'adelanto', 80, 'metodo_adelanto', 'plin',
                        'fecha_prometida', (current_date - 9)::text),
     jsonb_build_object('tipo', 'fotocopiadora', 'marca', 'Ricoh', 'modelo', 'MP2014',
@@ -169,7 +156,7 @@ begin
   -- 4.7 Cancelada por el cliente.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[1]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'fecha_prometida', (current_date - 5)::text),
     jsonb_build_object('tipo', 'parlante', 'marca', 'JBL', 'modelo', 'Charge 4',
                        'desperfecto', 'No carga'),
@@ -181,7 +168,7 @@ begin
   -- 4.8 Sin reparación posible: se cobra el diagnóstico y se devuelve.
   v_orden_id := crear_orden_completa(
     jsonb_build_object('id', v_cli[2]),
-    jsonb_build_object('empresa_id', v_empresa_id, 'tecnico_id', v_tecnico_id,
+    jsonb_build_object('tecnico_id', v_tecnico_id,
                        'adelanto', 30, 'metodo_adelanto', 'efectivo',
                        'fecha_prometida', (current_date - 4)::text),
     jsonb_build_object('tipo', 'tablet', 'marca', 'Huawei', 'modelo', 'MatePad',
@@ -191,7 +178,7 @@ begin
   );
   update orden set estado = 'sin_reparacion' where id = v_orden_id;
 
-  raise notice 'Taller de prueba creado: empresa %, técnico %', v_empresa_id, v_tecnico_id;
+  raise notice 'Taller de prueba creado: técnico %', v_tecnico_id;
 end $$;
 
 -- Comprobación rápida de que los importes cuadran.
